@@ -17,7 +17,18 @@ workflows:
         script: flutter pub get
 
       - name: Build iOS app without code signing (lets Flutter run all project migrations)
-        script: flutter build ios --release --no-codesign
+        script: |
+          # Flutter 3.35+ exits with code 1 after --no-codesign builds because it runs a
+          # post-build Development Team check even when signing is explicitly disabled.
+          # The Xcode compilation itself succeeds. Pipe to tee so the pipeline exit code
+          # is tee's (0), then verify "Xcode build done" appears before continuing.
+          set +o pipefail
+          flutter build ios --release --no-codesign 2>&1 | tee /tmp/flutter_build_log.txt
+          if ! grep -q "Xcode build done" /tmp/flutter_build_log.txt; then
+            echo "=== Flutter iOS build genuinely failed (not just a signing check) ==="
+            exit 1
+          fi
+          echo "=== Flutter migrations complete. Proceeding to code signing. ==="
 
       - name: Set up iOS code signing (runs AFTER Flutter migrations)
         script: |
