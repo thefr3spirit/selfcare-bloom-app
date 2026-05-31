@@ -37,15 +37,9 @@ workflows:
 
       - name: Build IPA
         script: |
-          rm -f /tmp/export_options.plist
-          /usr/libexec/PlistBuddy -c "Add :method string app-store" /tmp/export_options.plist
-          /usr/libexec/PlistBuddy -c "Add :teamID string C26VK7Y2WB" /tmp/export_options.plist
-          /usr/libexec/PlistBuddy -c "Add :signingStyle string manual" /tmp/export_options.plist
-          /usr/libexec/PlistBuddy -c "Add :stripSwiftSymbols bool true" /tmp/export_options.plist
-          /usr/libexec/PlistBuddy -c "Add :uploadSymbols bool true" /tmp/export_options.plist
-          flutter build ipa \
-            --release \
-            --export-options-plist=/tmp/export_options.plist
+          xcode-project build-ipa \
+            --workspace "ios/Runner.xcworkspace" \
+            --scheme "Runner"
 
     artifacts:
       - build/ios/ipa/*.ipa
