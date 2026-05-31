@@ -1,0 +1,40 @@
+workflows:
+  ios-release:
+    name: iOS App Store Release
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      xcode: 16.4
+      flutter: stable
+      cocoapods: default
+      integrations:
+        app_store_connect: Codemagic
+    scripts:
+      - name: Disable Swift Package Manager (prevents Podfile auto-upgrade)
+        script: flutter config --no-enable-swift-package-manager
+
+      - name: Get Flutter dependencies
+        script: flutter pub get
+
+      - name: Set up iOS code signing
+        script: |
+          keychain initialize
+          app-store-connect fetch-signing-files com.selfcarebloom.app \
+            --type IOS_APP_STORE \
+            --create
+          keychain add-certificates
+          xcode-project use-profiles
+
+      - name: Build IPA
+        script: |
+          flutter build ipa --release \
+            --export-options-plist=/Users/builder/export_options.plist
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
