@@ -41,9 +41,7 @@ workflows:
 
       - name: Archive and export IPA
         script: |
-          # Create export_options.plist using PlistBuddy (avoids YAML heredoc issues).
-          # We build it manually because Codemagic's auto-generated plist writes
-          # provisioningProfiles as an <array> instead of the required <dict>.
+          # Build export_options.plist via PlistBuddy (no heredoc, no YAML issues).
           rm -f /tmp/export_options.plist
           /usr/libexec/PlistBuddy -c "Add :method string app-store" /tmp/export_options.plist
           /usr/libexec/PlistBuddy -c "Add :teamID string C26VK7Y2WB" /tmp/export_options.plist
@@ -51,22 +49,16 @@ workflows:
           /usr/libexec/PlistBuddy -c "Add :stripSwiftSymbols bool true" /tmp/export_options.plist
           /usr/libexec/PlistBuddy -c "Add :uploadSymbols bool true" /tmp/export_options.plist
 
-          xcodebuild \
-            -workspace ios/Runner.xcworkspace \
-            -scheme Runner \
-            -sdk iphoneos \
-            -configuration Release \
-            -archivePath "$CM_BUILD_DIR/Runner.xcarchive" \
-            archive
-
-          xcodebuild \
-            -exportArchive \
-            -archivePath "$CM_BUILD_DIR/Runner.xcarchive" \
-            -exportOptionsPlist /tmp/export_options.plist \
-            -exportPath "$CM_BUILD_DIR/ios/ipa"
+          # Use flutter build ipa instead of manual xcodebuild archive + exportArchive.
+          # flutter build ipa integrates archive + export in one command and correctly
+          # uses the signing set up by xcode-project use-profiles above.
+          # Migrations already ran in the prior step so they are skipped here.
+          flutter build ipa \
+            --release \
+            --export-options-plist=/tmp/export_options.plist
 
     artifacts:
-      - $CM_BUILD_DIR/ios/ipa/*.ipa
+      - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
 
     publishing:
