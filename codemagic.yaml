@@ -16,7 +16,10 @@ workflows:
       - name: Get Flutter dependencies
         script: flutter pub get
 
-      - name: Set up iOS code signing
+      - name: Build iOS app without code signing (lets Flutter run all project migrations)
+        script: flutter build ios --release --no-codesign
+
+      - name: Set up iOS code signing (runs AFTER Flutter migrations)
         script: |
           keychain initialize
           app-store-connect fetch-signing-files com.selfcarebloom.app \
@@ -25,13 +28,24 @@ workflows:
           keychain add-certificates
           xcode-project use-profiles
 
-      - name: Build IPA
+      - name: Archive and export IPA
         script: |
-          flutter build ipa --release \
-            --export-options-plist=/Users/builder/export_options.plist
+          xcodebuild \
+            -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -sdk iphoneos \
+            -configuration Release \
+            -archivePath "$CM_BUILD_DIR/Runner.xcarchive" \
+            archive
+
+          xcodebuild \
+            -exportArchive \
+            -archivePath "$CM_BUILD_DIR/Runner.xcarchive" \
+            -exportOptionsPlist /Users/builder/export_options.plist \
+            -exportPath "$CM_BUILD_DIR/ios/ipa"
 
     artifacts:
-      - build/ios/ipa/*.ipa
+      - $CM_BUILD_DIR/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
 
     publishing:
