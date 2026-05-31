@@ -34,12 +34,22 @@ workflows:
             --create
           keychain add-certificates
           xcode-project use-profiles
+          # Extract the provisioning profile UUID for explicit use at build time
+          PROFILE_UUID=$(find ~/Library/MobileDevice/Provisioning\ Profiles/ \
+            -name "*.mobileprovision" -exec security cms -D -i {} \; 2>/dev/null \
+            | grep -A1 '<key>UUID</key>' | grep '<string>' \
+            | sed 's/.*<string>\(.*\)<\/string>.*/\1/' | head -1)
+          echo "Profile UUID: $PROFILE_UUID"
+          echo "$PROFILE_UUID" > /tmp/profile_uuid.txt
 
       - name: Build IPA
         script: |
+          PROFILE_UUID=$(cat /tmp/profile_uuid.txt)
+          echo "Using profile UUID: $PROFILE_UUID"
           xcode-project build-ipa \
             --workspace "ios/Runner.xcworkspace" \
-            --scheme "Runner"
+            --scheme "Runner" \
+            --archive-xcargs "CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY='Apple Distribution' DEVELOPMENT_TEAM=C26VK7Y2WB PROVISIONING_PROFILE_SPECIFIER=$PROFILE_UUID"
 
     artifacts:
       - build/ios/ipa/*.ipa
