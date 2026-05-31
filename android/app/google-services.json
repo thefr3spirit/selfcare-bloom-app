@@ -1,0 +1,63 @@
+{
+  "project_info": {
+    "project_number": "886791280277",
+    "project_id": "selfcare-bloom",
+    "storage_bucket": "selfcare-bloom.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:886791280277:android:22068005fa1c406227ed9c",
+        "android_client_info": {
+          "package_name": "com.selfcarebloom.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "886791280277-0bpgvti4dd5b1c97o81367sgncakmkhm.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.selfcarebloom.app",
+            "certificate_hash": "cef5818ba8a4a0edb97126a95fcb84190152d6ea"
+          }
+        },
+        {
+          "client_id": "886791280277-b1kt0slokuo8m88ikl2jb7eq9gb4h7i6.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.selfcarebloom.app",
+            "certificate_hash": "9a20bef3927b5f95ac4cf5d1e37b4a1dd35ea532"
+          }
+        },
+        {
+          "client_id": "886791280277-ev3d8684hcejmfkgcu1p14ipbhqaqruv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.selfcarebloom.app",
+            "certificate_hash": "c0a5f6fdad1535928464a84347e912db23000a71"
+          }
+        },
+        {
+          "client_id": "886791280277-r5m769fp5qk64353g4vnq1ikbbutqm2s.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAG1pAFhv24KgHFoyq1Wel-7GrMdJ6eLu0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "886791280277-r5m769fp5qk64353g4vnq1ikbbutqm2s.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
