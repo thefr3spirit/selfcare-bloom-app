@@ -9,6 +9,9 @@ workflows:
       xcode: 16.4
       flutter: stable
       cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.selfcarebloom.app
     scripts:
       - name: Disable Swift Package Manager (prevents Podfile auto-upgrade)
         script: flutter config --no-enable-swift-package-manager
@@ -26,30 +29,14 @@ workflows:
           fi
           echo "=== Flutter migrations complete. ==="
 
-      - name: Set up code signing
-        script: |
-          keychain initialize
-          app-store-connect fetch-signing-files com.selfcarebloom.app \
-            --type IOS_APP_STORE \
-            --create
-          keychain add-certificates
-          xcode-project use-profiles
-          # Extract the provisioning profile UUID for explicit use at build time
-          PROFILE_UUID=$(find ~/Library/MobileDevice/Provisioning\ Profiles/ \
-            -name "*.mobileprovision" -exec security cms -D -i {} \; 2>/dev/null \
-            | grep -A1 '<key>UUID</key>' | grep '<string>' \
-            | sed 's/.*<string>\(.*\)<\/string>.*/\1/' | head -1)
-          echo "Profile UUID: $PROFILE_UUID"
-          echo "$PROFILE_UUID" > /tmp/profile_uuid.txt
+      - name: Re-apply code signing after Flutter migrations
+        script: xcode-project use-profiles
 
       - name: Build IPA
         script: |
-          PROFILE_UUID=$(cat /tmp/profile_uuid.txt)
-          echo "Using profile UUID: $PROFILE_UUID"
           xcode-project build-ipa \
             --workspace "ios/Runner.xcworkspace" \
-            --scheme "Runner" \
-            --archive-xcargs "CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY='Apple Distribution' DEVELOPMENT_TEAM=C26VK7Y2WB PROVISIONING_PROFILE_SPECIFIER=$PROFILE_UUID"
+            --scheme "Runner"
 
     artifacts:
       - build/ios/ipa/*.ipa
