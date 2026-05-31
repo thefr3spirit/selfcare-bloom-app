@@ -41,22 +41,15 @@ workflows:
 
       - name: Archive and export IPA
         script: |
-          # Codemagic's auto-generated export_options.plist has a bug where
-          # provisioningProfiles is written as an array instead of a dict,
-          # causing xcodebuild -exportArchive to fail. Create it ourselves.
-          python3 - << 'PYEOF'
-import plistlib
-plist = {
-    "method": "app-store",
-    "teamID": "C26VK7Y2WB",
-    "signingStyle": "manual",
-    "stripSwiftSymbols": True,
-    "uploadSymbols": True,
-}
-with open("/tmp/export_options.plist", "wb") as f:
-    plistlib.dump(plist, f)
-print("export_options.plist created")
-PYEOF
+          # Create export_options.plist using PlistBuddy (avoids YAML heredoc issues).
+          # We build it manually because Codemagic's auto-generated plist writes
+          # provisioningProfiles as an <array> instead of the required <dict>.
+          rm -f /tmp/export_options.plist
+          /usr/libexec/PlistBuddy -c "Add :method string app-store" /tmp/export_options.plist
+          /usr/libexec/PlistBuddy -c "Add :teamID string C26VK7Y2WB" /tmp/export_options.plist
+          /usr/libexec/PlistBuddy -c "Add :signingStyle string manual" /tmp/export_options.plist
+          /usr/libexec/PlistBuddy -c "Add :stripSwiftSymbols bool true" /tmp/export_options.plist
+          /usr/libexec/PlistBuddy -c "Add :uploadSymbols bool true" /tmp/export_options.plist
 
           xcodebuild \
             -workspace ios/Runner.xcworkspace \
