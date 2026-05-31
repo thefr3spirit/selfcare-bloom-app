@@ -9,9 +9,6 @@ workflows:
       xcode: 16.4
       flutter: stable
       cocoapods: default
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.selfcarebloom.app
     scripts:
       - name: Disable Swift Package Manager (prevents Podfile auto-upgrade)
         script: flutter config --no-enable-swift-package-manager
@@ -19,13 +16,8 @@ workflows:
       - name: Get Flutter dependencies
         script: flutter pub get
 
-      - name: Run Flutter iOS migrations (before re-applying code signing)
+      - name: Run Flutter iOS migrations (no codesign)
         script: |
-          # ios_signing (above) already set up certs+profiles before scripts ran.
-          # We run flutter build ios --no-codesign here ONLY to trigger Flutter
-          # project migrations (UIScene lifecycle, Podfile upgrade, etc.).
-          # Flutter 3.35+ exits code 1 due to a post-build team check even with
-          # --no-codesign; pipe through tee so the step only fails on real errors.
           set +o pipefail
           flutter build ios --release --no-codesign 2>&1 | tee /tmp/flutter_build_log.txt
           if ! grep -q "Xcode build done" /tmp/flutter_build_log.txt; then
@@ -34,11 +26,13 @@ workflows:
           fi
           echo "=== Flutter migrations complete. ==="
 
-      - name: Re-apply code signing after Flutter migrations
+      - name: Set up code signing
         script: |
-          # Flutter migrations may reset project signing settings.
-          # Re-run use-profiles (profiles already in place from ios_signing above)
-          # to restore Manual signing with the Distribution certificate.
+          keychain initialize
+          app-store-connect fetch-signing-files com.selfcarebloom.app \
+            --type IOS_APP_STORE \
+            --create
+          keychain add-certificates
           xcode-project use-profiles
 
       - name: Build IPA
