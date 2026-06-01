@@ -19,6 +19,9 @@ workflows:
       - name: Get Flutter dependencies
         script: flutter pub get
 
+      - name: Generate Hive adapters (build_runner)
+        script: dart run build_runner build --delete-conflicting-outputs
+
       - name: Run Flutter iOS migrations (no codesign)
         script: |
           set +o pipefail
