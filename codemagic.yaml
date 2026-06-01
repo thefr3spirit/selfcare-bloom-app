@@ -30,7 +30,12 @@ workflows:
           echo "=== Flutter migrations complete. ==="
 
       - name: Re-apply code signing after Flutter migrations
-        script: xcode-project use-profiles
+        script: |
+          xcode-project use-profiles
+          echo "=== Signing settings applied by use-profiles ==="
+          grep -E "CODE_SIGN_STYLE|DEVELOPMENT_TEAM|PROVISIONING_PROFILE_SPECIFIER|CODE_SIGN_IDENTITY" ios/Runner.xcodeproj/project.pbxproj | head -20 || echo "WARNING: No signing settings found in project.pbxproj"
+          echo "=== Installed provisioning profiles ==="
+          ls ~/Library/MobileDevice/Provisioning\ Profiles/ 2>/dev/null || echo "No profiles directory found"
 
       - name: Build IPA
         script: |
@@ -43,12 +48,7 @@ workflows:
           /usr/libexec/PlistBuddy -c "Add :provisioningProfiles:com.selfcarebloom.app string newselfcarep" /tmp/export_options.plist
           flutter build ipa \
             --release \
-            --export-options-plist=/tmp/export_options.plist \
-            -- \
-            CODE_SIGN_STYLE=Manual \
-            "CODE_SIGN_IDENTITY=Apple Distribution" \
-            DEVELOPMENT_TEAM=C26VK7Y2WB \
-            PROVISIONING_PROFILE_SPECIFIER=newselfcarep
+            --export-options-plist=/tmp/export_options.plist
 
     artifacts:
       - build/ios/ipa/*.ipa
