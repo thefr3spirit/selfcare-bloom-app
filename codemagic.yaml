@@ -32,10 +32,23 @@ workflows:
       - name: Re-apply code signing after Flutter migrations
         script: |
           xcode-project use-profiles
-          echo "=== Signing settings applied by use-profiles ==="
-          grep -E "CODE_SIGN_STYLE|DEVELOPMENT_TEAM|PROVISIONING_PROFILE_SPECIFIER|CODE_SIGN_IDENTITY" ios/Runner.xcodeproj/project.pbxproj | head -20 || echo "WARNING: No signing settings found in project.pbxproj"
-          echo "=== Installed provisioning profiles ==="
-          ls ~/Library/MobileDevice/Provisioning\ Profiles/ 2>/dev/null || echo "No profiles directory found"
+          echo "=== Writing signing settings directly into project.pbxproj via xcodeproj gem ==="
+          ruby << 'RUBY_SCRIPT'
+          require 'xcodeproj'
+          project = Xcodeproj::Project.open('ios/Runner.xcodeproj')
+          project.targets.select { |t| t.name == 'Runner' }.each do |target|
+            target.build_configurations.each do |config|
+              config.build_settings['CODE_SIGN_STYLE'] = 'Manual'
+              config.build_settings['CODE_SIGN_IDENTITY'] = 'Apple Distribution'
+              config.build_settings['DEVELOPMENT_TEAM'] = 'C26VK7Y2WB'
+              config.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = 'newselfcarep'
+            end
+          end
+          project.save
+          puts 'Done writing signing settings.'
+          RUBY_SCRIPT
+          echo "=== Signing settings now in project.pbxproj ==="
+          grep -E "CODE_SIGN_STYLE|DEVELOPMENT_TEAM|PROVISIONING_PROFILE_SPECIFIER|CODE_SIGN_IDENTITY" ios/Runner.xcodeproj/project.pbxproj | head -20
 
       - name: Build IPA
         script: |
