@@ -44,10 +44,16 @@ workflows:
           flutter build ipa \
             --release \
             --export-options-plist=/Users/builder/export_options.plist 2>&1 | tee /tmp/flutter_ipa_log.txt || {
-            echo "=== BUILD FAILED — last 60 lines ==="
-            tail -60 /tmp/flutter_ipa_log.txt
-            echo "=== Xcodebuild logs ==="
-            find /tmp/xcodebuild_logs -name "*.log" -exec sh -c 'echo "--- $1 ---"; tail -80 "$1"' _ {} \; 2>/dev/null || echo "No xcodebuild logs at /tmp/xcodebuild_logs"
+            echo "=============================="
+            echo "=== BUILD FAILED ==="
+            echo "=============================="
+            echo "--- Error lines from flutter output ---"
+            grep -iE "error:|xcode error|no profile|no matching|code sign|archive failed|could not find" /tmp/flutter_ipa_log.txt | grep -v "^    note:" | head -40 || echo "(grep found no matching error lines — scroll up in this log for context)"
+            echo "--- Raw xcodebuild log files ---"
+            for f in /tmp/xcodebuild_logs/*.log ~/Library/Logs/gym/*.log; do
+              [ -f "$f" ] && { echo "=== $f ==="; grep -iE "error:|archive failed|code sign|no profile" "$f" | head -40; }
+            done 2>/dev/null || echo "No xcodebuild log files found"
+            echo "=============================="
             exit 1
           }
 
