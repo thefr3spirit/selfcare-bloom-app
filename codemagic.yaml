@@ -60,11 +60,12 @@ workflows:
           project = Xcodeproj::Project.open('ios/Runner.xcodeproj')
           project.targets.select { |t| t.name == 'Runner' }.each do |target|
             target.build_configurations.each do |config|
-              config.build_settings['CODE_SIGN_STYLE']                = 'Manual'
-              config.build_settings['CODE_SIGN_IDENTITY']             = 'Apple Distribution'
-              config.build_settings['DEVELOPMENT_TEAM']               = 'C26VK7Y2WB'
-              config.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = profile_name
-              config.build_settings['PROVISIONING_PROFILE']           = profile_uuid
+              config.build_settings['CODE_SIGN_STYLE']                    = 'Manual'
+              config.build_settings['CODE_SIGN_IDENTITY']                 = 'Apple Distribution'
+              config.build_settings['CODE_SIGN_IDENTITY[sdk=iphoneos*]']  = 'Apple Distribution'
+              config.build_settings['DEVELOPMENT_TEAM']                   = 'C26VK7Y2WB'
+              config.build_settings['PROVISIONING_PROFILE_SPECIFIER']     = profile_name
+              config.build_settings['PROVISIONING_PROFILE']               = profile_uuid
             end
           end
           project.save
