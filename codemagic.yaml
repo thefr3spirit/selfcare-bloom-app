@@ -32,29 +32,46 @@ workflows:
       - name: Re-apply code signing after Flutter migrations
         script: |
           xcode-project use-profiles
-          echo "=== Actual installed provisioning profile names ==="
+          echo "=== Detecting installed provisioning profile ==="
+          PROFILE_NAME=""
+          PROFILE_UUID=""
           for f in ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision; do
-            echo -n "$f -> "; security cms -D -i "$f" 2>/dev/null | grep -A1 "<key>Name</key>" | grep "<string>" | sed 's/.*<string>\(.*\)<\/string>/\1/'
+            PLIST=$(security cms -D -i "$f" 2>/dev/null)
+            if echo "$PLIST" | grep -q "com.selfcarebloom.app"; then
+              PROFILE_NAME=$(echo "$PLIST" | grep -A1 "<key>Name</key>" | grep "<string>" | sed 's/.*<string>\(.*\)<\/string>/\1/' | head -1)
+              PROFILE_UUID=$(echo "$PLIST" | grep -A1 "<key>UUID</key>" | grep "<string>" | sed 's/.*<string>\(.*\)<\/string>/\1/' | head -1)
+              echo "Found: Name='$PROFILE_NAME'  UUID='$PROFILE_UUID'"
+              break
+            fi
           done
-          echo "=== Signing settings set by use-profiles ==="
-          grep -E "CODE_SIGN_STYLE|DEVELOPMENT_TEAM|PROVISIONING_PROFILE_SPECIFIER|CODE_SIGN_IDENTITY" ios/Runner.xcodeproj/project.pbxproj | head -20 || echo "WARNING: No signing settings set"
-          echo "=== Ensuring CODE_SIGN_STYLE and DEVELOPMENT_TEAM via xcodeproj gem ==="
+          if [ -z "$PROFILE_NAME" ]; then
+            echo "ERROR: No profile matching com.selfcarebloom.app found. Listing all profiles:"
+            for f in ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision; do
+              echo -n "  $f -> "; security cms -D -i "$f" 2>/dev/null | grep -A1 "<key>Name</key>" | grep "<string>" | sed 's/.*<string>\(.*\)<\/string>/\1/'
+            done
+            exit 1
+          fi
+          export CM_PROFILE_NAME="$PROFILE_NAME"
+          export CM_PROFILE_UUID="$PROFILE_UUID"
           ruby << 'RUBY_SCRIPT'
           require 'xcodeproj'
+          profile_name = ENV['CM_PROFILE_NAME']
+          profile_uuid = ENV['CM_PROFILE_UUID']
           project = Xcodeproj::Project.open('ios/Runner.xcodeproj')
           project.targets.select { |t| t.name == 'Runner' }.each do |target|
             target.build_configurations.each do |config|
-              config.build_settings['CODE_SIGN_STYLE'] = 'Manual'
-              config.build_settings['CODE_SIGN_IDENTITY'] = 'Apple Distribution'
-              config.build_settings['DEVELOPMENT_TEAM'] = 'C26VK7Y2WB'
-              # PROVISIONING_PROFILE_SPECIFIER is set by xcode-project use-profiles (reads actual profile name)
+              config.build_settings['CODE_SIGN_STYLE']                = 'Manual'
+              config.build_settings['CODE_SIGN_IDENTITY']             = 'Apple Distribution'
+              config.build_settings['DEVELOPMENT_TEAM']               = 'C26VK7Y2WB'
+              config.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = profile_name
+              config.build_settings['PROVISIONING_PROFILE']           = profile_uuid
             end
           end
           project.save
-          puts 'Done.'
+          puts "Done. Set profile: #{profile_name} (#{profile_uuid})"
           RUBY_SCRIPT
           echo "=== Final signing settings in project.pbxproj ==="
-          grep -E "CODE_SIGN_STYLE|DEVELOPMENT_TEAM|PROVISIONING_PROFILE_SPECIFIER|CODE_SIGN_IDENTITY" ios/Runner.xcodeproj/project.pbxproj | head -20
+          grep -E "CODE_SIGN_STYLE|DEVELOPMENT_TEAM|PROVISIONING_PROFILE|CODE_SIGN_IDENTITY" ios/Runner.xcodeproj/project.pbxproj | head -20
 
       - name: Build IPA
         script: |
