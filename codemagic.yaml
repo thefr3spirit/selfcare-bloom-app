@@ -38,9 +38,17 @@ workflows:
           /usr/libexec/PlistBuddy -c "Add :method string app-store" /tmp/export_options.plist
           /usr/libexec/PlistBuddy -c "Add :teamID string C26VK7Y2WB" /tmp/export_options.plist
           /usr/libexec/PlistBuddy -c "Add :signingStyle string manual" /tmp/export_options.plist
+          /usr/libexec/PlistBuddy -c "Add :signingCertificate string Apple Distribution" /tmp/export_options.plist
+          /usr/libexec/PlistBuddy -c "Add :provisioningProfiles dict" /tmp/export_options.plist
+          /usr/libexec/PlistBuddy -c "Add :provisioningProfiles:com.selfcarebloom.app string newselfcarep" /tmp/export_options.plist
           flutter build ipa \
             --release \
-            --export-options-plist=/tmp/export_options.plist
+            --export-options-plist=/tmp/export_options.plist \
+            -- \
+            CODE_SIGN_STYLE=Manual \
+            "CODE_SIGN_IDENTITY=Apple Distribution" \
+            DEVELOPMENT_TEAM=C26VK7Y2WB \
+            PROVISIONING_PROFILE_SPECIFIER=newselfcarep
 
     artifacts:
       - build/ios/ipa/*.ipa
