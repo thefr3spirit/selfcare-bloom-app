@@ -32,7 +32,13 @@ workflows:
       - name: Re-apply code signing after Flutter migrations
         script: |
           xcode-project use-profiles
-          echo "=== Writing signing settings directly into project.pbxproj via xcodeproj gem ==="
+          echo "=== Actual installed provisioning profile names ==="
+          for f in ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision; do
+            echo -n "$f -> "; security cms -D -i "$f" 2>/dev/null | grep -A1 "<key>Name</key>" | grep "<string>" | sed 's/.*<string>\(.*\)<\/string>/\1/'
+          done
+          echo "=== Signing settings set by use-profiles ==="
+          grep -E "CODE_SIGN_STYLE|DEVELOPMENT_TEAM|PROVISIONING_PROFILE_SPECIFIER|CODE_SIGN_IDENTITY" ios/Runner.xcodeproj/project.pbxproj | head -20 || echo "WARNING: No signing settings set"
+          echo "=== Ensuring CODE_SIGN_STYLE and DEVELOPMENT_TEAM via xcodeproj gem ==="
           ruby << 'RUBY_SCRIPT'
           require 'xcodeproj'
           project = Xcodeproj::Project.open('ios/Runner.xcodeproj')
@@ -41,13 +47,13 @@ workflows:
               config.build_settings['CODE_SIGN_STYLE'] = 'Manual'
               config.build_settings['CODE_SIGN_IDENTITY'] = 'Apple Distribution'
               config.build_settings['DEVELOPMENT_TEAM'] = 'C26VK7Y2WB'
-              config.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = 'newselfcarep'
+              # PROVISIONING_PROFILE_SPECIFIER is set by xcode-project use-profiles (reads actual profile name)
             end
           end
           project.save
-          puts 'Done writing signing settings.'
+          puts 'Done.'
           RUBY_SCRIPT
-          echo "=== Signing settings now in project.pbxproj ==="
+          echo "=== Final signing settings in project.pbxproj ==="
           grep -E "CODE_SIGN_STYLE|DEVELOPMENT_TEAM|PROVISIONING_PROFILE_SPECIFIER|CODE_SIGN_IDENTITY" ios/Runner.xcodeproj/project.pbxproj | head -20
 
       - name: Build IPA
