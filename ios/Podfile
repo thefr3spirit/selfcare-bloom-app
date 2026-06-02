@@ -121,4 +121,37 @@ post_install do |installer|
   else
     puts "Warning: Flutter.xcframework not found at #{xcfw_base} — skipping Info.plist injection"
   end
+
+  # Patch Pods-Runner-frameworks.sh to inject Info.plist into Flutter.framework
+  # AT EMBED TIME — this code appended to the script runs inside the
+  # [CP] Embed Pods Frameworks build phase during xcodebuild archive, AFTER the
+  # framework has been copied to Runner.app/Frameworks but BEFORE the Validate phase.
+  # This survives flutter assemble re-running (which overwrites ios/Flutter) because
+  # it patches the ALREADY-EMBEDDED copy using Xcode's own build environment variables.
+  fw_script = File.join(installer.sandbox.root, 'Target Support Files', 'Pods-Runner', 'Pods-Runner-frameworks.sh')
+  if File.exist?(fw_script)
+    content = File.read(fw_script)
+    unless content.include?('CM_FLUTTER_PLIST_INJECT')
+      plist_xml = '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleExecutable</key><string>Flutter</string><key>CFBundleIdentifier</key><string>io.flutter.flutter</string><key>CFBundleInfoDictionaryVersion</key><string>6.0</string><key>CFBundleName</key><string>Flutter</string><key>CFBundlePackageType</key><string>FMWK</string><key>CFBundleShortVersionString</key><string>1.0</string><key>CFBundleVersion</key><string>1</string><key>MinimumOSVersion</key><string>15.0</string></dict></plist>'
+      inject = <<~BASH
+
+        # CM_FLUTTER_PLIST_INJECT: Xcode 26+ requires Info.plist in embedded Flutter.framework.
+        # Runs after all install_framework calls above, inside [CP] Embed Pods Frameworks.
+        for _cm_base in "${TARGET_BUILD_DIR}" "${BUILT_PRODUCTS_DIR}"; do
+          _cm_fw="${_cm_base}/${FRAMEWORKS_FOLDER_PATH}/Flutter.framework"
+          if [ -d "${_cm_fw}" ] && [ ! -f "${_cm_fw}/Info.plist" ]; then
+            printf '%s' '#{plist_xml}' > "${_cm_fw}/Info.plist" \
+              && echo "CM_FLUTTER_PLIST_INJECT: patched ${_cm_fw}" \
+              || echo "CM_FLUTTER_PLIST_INJECT: FAILED at ${_cm_fw}"
+          fi
+        done
+      BASH
+      File.write(fw_script, content + inject)
+      puts "Patched Pods-Runner-frameworks.sh with CM_FLUTTER_PLIST_INJECT"
+    else
+      puts "Pods-Runner-frameworks.sh already has CM_FLUTTER_PLIST_INJECT"
+    end
+  else
+    puts "WARNING: Pods-Runner-frameworks.sh not found at #{fw_script}"
+  end
 end
