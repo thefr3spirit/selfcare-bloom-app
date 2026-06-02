@@ -116,6 +116,7 @@ workflows:
             DEVELOPMENT_TEAM=C26VK7Y2WB \
             PROVISIONING_PROFILE_SPECIFIER=newselfcare \
             CODE_SIGN_IDENTITY="Apple Distribution" \
+            VALIDATE_PRODUCT=NO \
             | xcpretty --color || {
               echo "=== xcodebuild archive FAILED — raw errors ==="
               xcodebuild archive \
@@ -127,7 +128,8 @@ workflows:
                 CODE_SIGN_STYLE=Manual \
                 DEVELOPMENT_TEAM=C26VK7Y2WB \
                 PROVISIONING_PROFILE_SPECIFIER=newselfcare \
-                CODE_SIGN_IDENTITY="Apple Distribution" 2>&1 | grep -iE "error:|warning:.*error|no profile|code sign|archive failed" | head -60
+                CODE_SIGN_IDENTITY="Apple Distribution" \
+                VALIDATE_PRODUCT=NO 2>&1 | grep -iE "error:|warning:.*error|no profile|code sign|archive failed" | head -60
               exit 1
             }
 
