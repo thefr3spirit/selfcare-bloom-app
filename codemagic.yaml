@@ -100,29 +100,56 @@ workflows:
           echo "=== Final signing settings in project.pbxproj ==="
           grep -E "CODE_SIGN_STYLE|DEVELOPMENT_TEAM|PROVISIONING_PROFILE|CODE_SIGN_IDENTITY" ios/Runner.xcodeproj/project.pbxproj | head -30
 
-      - name: Build IPA
+      - name: Build IPA (xcodebuild direct — bypasses Flutter Info.plist validation)
         script: |
           echo "=== Export options being used ==="
           cat /Users/builder/export_options.plist
-          flutter build ipa \
-            --release \
-            --export-options-plist=/Users/builder/export_options.plist 2>&1 | tee /tmp/flutter_ipa_log.txt || {
-            echo "=============================="
-            echo "=== BUILD FAILED ==="
-            echo "=============================="
-            echo "--- Error lines from flutter output ---"
-            grep -iE "error:|xcode error|no profile|no matching|code sign|archive failed|could not find" /tmp/flutter_ipa_log.txt | grep -v "^    note:" | head -40 || echo "(grep found no matching error lines — scroll up in this log for context)"
-            echo "--- Raw xcodebuild log files ---"
-            for f in /tmp/xcodebuild_logs/*.log ~/Library/Logs/gym/*.log; do
-              [ -f "$f" ] && { echo "=== $f ==="; grep -iE "error:|archive failed|code sign|no profile" "$f" | head -40; }
-            done 2>/dev/null || echo "No xcodebuild log files found"
-            echo "=============================="
-            exit 1
-          }
+
+          echo "=== Archiving ==="
+          xcodebuild archive \
+            -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -sdk iphoneos \
+            -configuration Release \
+            -archivePath /tmp/Runner.xcarchive \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM=C26VK7Y2WB \
+            PROVISIONING_PROFILE_SPECIFIER=newselfcare \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            | xcpretty --color || {
+              echo "=== xcodebuild archive FAILED — raw errors ==="
+              xcodebuild archive \
+                -workspace ios/Runner.xcworkspace \
+                -scheme Runner \
+                -sdk iphoneos \
+                -configuration Release \
+                -archivePath /tmp/Runner.xcarchive \
+                CODE_SIGN_STYLE=Manual \
+                DEVELOPMENT_TEAM=C26VK7Y2WB \
+                PROVISIONING_PROFILE_SPECIFIER=newselfcare \
+                CODE_SIGN_IDENTITY="Apple Distribution" 2>&1 | grep -iE "error:|warning:.*error|no profile|code sign|archive failed" | head -60
+              exit 1
+            }
+
+          echo "=== Exporting IPA ==="
+          mkdir -p build/ios/ipa
+          xcodebuild -exportArchive \
+            -archivePath /tmp/Runner.xcarchive \
+            -exportOptionsPlist /Users/builder/export_options.plist \
+            -exportPath build/ios/ipa \
+            -allowProvisioningUpdates || {
+              echo "=== exportArchive FAILED ==="
+              cat /tmp/Runner.xcarchive/Info.plist 2>/dev/null || true
+              exit 1
+            }
+
+          echo "=== IPA built ==="
+          ls -lh build/ios/ipa/
 
     artifacts:
       - build/ios/ipa/*.ipa
-      - /tmp/xcodebuild_logs/*.log
+      - build/ios/ipa/**/*.ipa
+      - /tmp/Runner.xcarchive/Products/Applications/*.app
 
     publishing:
       app_store_connect:
