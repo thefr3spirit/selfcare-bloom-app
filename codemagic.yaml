@@ -97,23 +97,23 @@ workflows:
       - name: Build IPA (xcodebuild direct — bypasses Flutter Info.plist validation)
         script: |
           echo "=== Overwriting export_options.plist (clean — app only, no frameworks) ==="
-          cat > /Users/builder/export_options.plist << 'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-  <key>method</key><string>app-store</string>
-  <key>teamID</key><string>C26VK7Y2WB</string>
-  <key>signingStyle</key><string>manual</string>
-  <key>signingCertificate</key><string>Apple Distribution</string>
-  <key>provisioningProfiles</key>
-  <dict>
-    <key>com.selfcarebloom.app</key><string>newselfcare</string>
-  </dict>
-  <key>stripSwiftSymbols</key><true/>
-  <key>uploadSymbols</key><true/>
-  <key>uploadBitcode</key><false/>
-</dict></plist>
-EOF
+          printf '%s\n' \
+            '<?xml version="1.0" encoding="UTF-8"?>' \
+            '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' \
+            '<plist version="1.0"><dict>' \
+            '  <key>method</key><string>app-store</string>' \
+            '  <key>teamID</key><string>C26VK7Y2WB</string>' \
+            '  <key>signingStyle</key><string>manual</string>' \
+            '  <key>signingCertificate</key><string>Apple Distribution</string>' \
+            '  <key>provisioningProfiles</key>' \
+            '  <dict>' \
+            '    <key>com.selfcarebloom.app</key><string>newselfcare</string>' \
+            '  </dict>' \
+            '  <key>stripSwiftSymbols</key><true/>' \
+            '  <key>uploadSymbols</key><true/>' \
+            '  <key>uploadBitcode</key><false/>' \
+            '</dict></plist>' \
+            > /Users/builder/export_options.plist
           echo "=== Export options being used ==="
           cat /Users/builder/export_options.plist
 
