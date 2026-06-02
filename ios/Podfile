@@ -62,13 +62,33 @@ post_install do |installer|
     end
   end
 
-  # Fix for Xcode 16 "source: unbound variable" in CocoaPods-generated framework scripts.
-  # The scripts use `set -u` (strict unbound vars) but $source can be unset in archive context.
+  # Fix for CocoaPods/Xcode 16+ generated framework scripts:
+  # (a) set -u crashes when $source is unset; set +u silences it BUT then an empty
+  #     $source causes `ditto "" destination` which copies the cwd (the ios/ dir)
+  #     into Runner.app/Frameworks/ — causing App Store rejection.
+  # Fix both: disable set -u AND guard every `ditto "${source}"` call.
   Dir.glob(File.join(installer.sandbox.root, 'Target Support Files', '*', '*.sh')).each do |script|
     content = File.read(script)
+    modified = false
+
+    # (a) Disable strict unbound-variable mode
     if content.include?('set -u')
-      File.write(script, content.gsub(/^set -u$/, 'set +u'))
-      puts "Patched set -u → set +u in #{File.basename(script)}"
+      content = content.gsub(/^set -u$/, 'set +u')
+      modified = true
+    end
+
+    # (b) Guard ditto calls that use ${source} — skip if source resolved to empty
+    if content.include?('ditto "${source}"') && !content.include?('CM_SOURCE_GUARD')
+      content = content.gsub(
+        /([ \t]*)(ditto\s+"\$\{source\}")/,
+        "\\1[ -z \"${source:-}\" ] && { echo \"CM_SOURCE_GUARD: skipping unresolved ${BASENAME}\"; return; }\n\\1\\2"
+      )
+      modified = true
+    end
+
+    if modified
+      File.write(script, content)
+      puts "Patched #{File.basename(script)}"
     end
   end
 end

@@ -6,7 +6,7 @@ workflows:
     integrations:
       app_store_connect: Codemagic
     environment:
-      xcode: 16.4
+      xcode: latest
       flutter: stable
       cocoapods: default
       ios_signing:
