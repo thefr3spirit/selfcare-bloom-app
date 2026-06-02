@@ -19,6 +19,31 @@ workflows:
       - name: Get Flutter dependencies
         script: flutter pub get
 
+      - name: Precache Flutter iOS engine + fix Info.plist (required by Xcode 26+)
+        script: |
+          flutter precache --ios
+          FLUTTER_SDK=$(dirname $(dirname $(which flutter)))
+          echo "Flutter SDK: $FLUTTER_SDK"
+          # Xcode 26 requires Info.plist inside every embedded .framework slice.
+          # Flutter's pre-built engine xcframework slices were built before this requirement.
+          find "$FLUTTER_SDK/bin/cache/artifacts/engine" -name "Flutter.framework" -type d | while IFS= read -r fw; do
+            if [ ! -f "$fw/Info.plist" ]; then
+              echo "Injecting Info.plist into $fw"
+              /usr/libexec/PlistBuddy \
+                -c "Add :CFBundleExecutable string Flutter" \
+                -c "Add :CFBundleIdentifier string io.flutter.flutter" \
+                -c "Add :CFBundleInfoDictionaryVersion string 6.0" \
+                -c "Add :CFBundleName string Flutter" \
+                -c "Add :CFBundlePackageType string FMWK" \
+                -c "Add :CFBundleShortVersionString string 1.0" \
+                -c "Add :CFBundleVersion string 1" \
+                -c "Add :MinimumOSVersion string 15.0" \
+                "$fw/Info.plist" && echo "  Done: $fw/Info.plist"
+            else
+              echo "Info.plist already present: $fw"
+            fi
+          done
+
       - name: Generate Hive adapters (build_runner)
         script: dart run build_runner build --delete-conflicting-outputs
 
