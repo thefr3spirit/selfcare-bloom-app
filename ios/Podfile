@@ -42,6 +42,9 @@ post_install do |installer|
     flutter_additional_ios_build_settings(target)
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+      # Prevent pod frameworks from embedding provisioning profiles (causes exportArchive errors)
+      config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+      config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
       # Remove unsupported -G flag (added by gRPC-Core, not supported on Apple ARM64)
       ['OTHER_CFLAGS', 'OTHER_CPLUSPLUSFLAGS'].each do |key|
         flags = config.build_settings[key]

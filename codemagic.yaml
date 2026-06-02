@@ -131,10 +131,9 @@ workflows:
             -derivedDataPath /tmp/xcodebuild_derived_data \
             CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM=C26VK7Y2WB \
-            PROVISIONING_PROFILE_SPECIFIER=newselfcare \
             CODE_SIGN_IDENTITY="Apple Distribution" \
             PRODUCT_BUNDLE_IDENTIFIER=com.selfcarebloom.app \
-            | xcpretty --color || {
+            | xcpretty --color || { # PROVISIONING_PROFILE_SPECIFIER intentionally omitted — set per-target by xcode-project use-profiles
               echo "=== xcodebuild archive FAILED — raw errors ==="
               xcodebuild archive \
                 -workspace ios/Runner.xcworkspace \
@@ -145,7 +144,6 @@ workflows:
                 -derivedDataPath /tmp/xcodebuild_derived_data \
                 CODE_SIGN_STYLE=Manual \
                 DEVELOPMENT_TEAM=C26VK7Y2WB \
-                PROVISIONING_PROFILE_SPECIFIER=newselfcare \
                 CODE_SIGN_IDENTITY="Apple Distribution" \
                 PRODUCT_BUNDLE_IDENTIFIER=com.selfcarebloom.app 2>&1 | grep -iE "error:|warning:.*error|no profile|code sign|archive failed" | head -60
               exit 1
