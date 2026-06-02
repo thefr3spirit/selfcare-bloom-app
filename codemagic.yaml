@@ -36,6 +36,7 @@ workflows:
             echo "Found: $fw"
             if [ ! -f "$fw/Info.plist" ]; then
               echo "  → Injecting Info.plist"
+              chmod -R u+w "$fw"
               /usr/libexec/PlistBuddy \
                 -c "Add :CFBundleExecutable string Flutter" \
                 -c "Add :CFBundleIdentifier string io.flutter.flutter" \
@@ -75,6 +76,7 @@ workflows:
             echo "Found: $fw"
             if [ ! -f "$fw/Info.plist" ]; then
               echo "  → Injecting Info.plist"
+              chmod -R u+w "$fw"
               /usr/libexec/PlistBuddy \
                 -c "Add :CFBundleExecutable string Flutter" \
                 -c "Add :CFBundleIdentifier string io.flutter.flutter" \

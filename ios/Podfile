@@ -91,4 +91,34 @@ post_install do |installer|
       puts "Patched #{File.basename(script)}"
     end
   end
+
+  # Inject Info.plist into Flutter.framework slices — required by Xcode 26+.
+  # flutter assemble runs BEFORE pod install (Flutter's build order), so
+  # ios/Flutter/Flutter.xcframework already exists when this hook runs.
+  # chmod is required — engine-cache copies are read-only on some CI environments.
+  xcfw_base = File.expand_path('Flutter/Flutter.xcframework', File.dirname(__FILE__))
+  if File.directory?(xcfw_base)
+    Dir.glob("#{xcfw_base}/**/*.framework").each do |fw|
+      plist = File.join(fw, 'Info.plist')
+      next if File.exist?(plist)
+      system("chmod -R u+w '#{fw}'")
+      File.write(plist, <<~XML)
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0"><dict>
+          <key>CFBundleExecutable</key><string>Flutter</string>
+          <key>CFBundleIdentifier</key><string>io.flutter.flutter</string>
+          <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+          <key>CFBundleName</key><string>Flutter</string>
+          <key>CFBundlePackageType</key><string>FMWK</string>
+          <key>CFBundleShortVersionString</key><string>1.0</string>
+          <key>CFBundleVersion</key><string>1</string>
+          <key>MinimumOSVersion</key><string>15.0</string>
+        </dict></plist>
+      XML
+      puts "Injected Info.plist into #{fw}"
+    end
+  else
+    puts "Warning: Flutter.xcframework not found at #{xcfw_base} — skipping Info.plist injection"
+  end
 end
