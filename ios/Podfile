@@ -61,4 +61,14 @@ post_install do |installer|
       File.write(xcconfig_path, content.gsub(/-G\d*\s*/, '').squeeze(' '))
     end
   end
+
+  # Fix for Xcode 16 "source: unbound variable" in CocoaPods-generated framework scripts.
+  # The scripts use `set -u` (strict unbound vars) but $source can be unset in archive context.
+  Dir.glob(File.join(installer.sandbox.root, 'Target Support Files', '*', '*.sh')).each do |script|
+    content = File.read(script)
+    if content.include?('set -u')
+      File.write(script, content.gsub(/^set -u$/, 'set +u'))
+      puts "Patched set -u → set +u in #{File.basename(script)}"
+    end
+  end
 end
