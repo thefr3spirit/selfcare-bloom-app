@@ -19,16 +19,23 @@ workflows:
       - name: Get Flutter dependencies
         script: flutter pub get
 
-      - name: Precache Flutter iOS engine + fix Info.plist (required by Xcode 26+)
+      - name: Precache Flutter iOS engine + fix Info.plist in engine cache (Xcode 26+)
         script: |
           flutter precache --ios
-          FLUTTER_SDK=$(dirname $(dirname $(which flutter)))
-          echo "Flutter SDK: $FLUTTER_SDK"
-          # Xcode 26 requires Info.plist inside every embedded .framework slice.
-          # Flutter's pre-built engine xcframework slices were built before this requirement.
-          find "$FLUTTER_SDK/bin/cache/artifacts/engine" -name "Flutter.framework" -type d | while IFS= read -r fw; do
+          # Use Generated.xcconfig for the authoritative FLUTTER_ROOT path.
+          # (which flutter returns a symlink; dirname/dirname of the symlink is wrong)
+          FLUTTER_SDK=$(grep "^FLUTTER_ROOT=" ios/Flutter/Generated.xcconfig | cut -d= -f2-)
+          echo "Flutter SDK from Generated.xcconfig: $FLUTTER_SDK"
+          if [ -z "$FLUTTER_SDK" ]; then
+            FLUTTER_SDK=$(dirname $(dirname $(realpath $(which flutter) 2>/dev/null || readlink $(which flutter) || which flutter)))
+            echo "Flutter SDK (fallback): $FLUTTER_SDK"
+          fi
+          FOUND=0
+          find "$FLUTTER_SDK/bin/cache/artifacts/engine" -name "Flutter.framework" -type d 2>/dev/null | while IFS= read -r fw; do
+            FOUND=$((FOUND+1))
+            echo "Found: $fw"
             if [ ! -f "$fw/Info.plist" ]; then
-              echo "Injecting Info.plist into $fw"
+              echo "  → Injecting Info.plist"
               /usr/libexec/PlistBuddy \
                 -c "Add :CFBundleExecutable string Flutter" \
                 -c "Add :CFBundleIdentifier string io.flutter.flutter" \
@@ -38,11 +45,12 @@ workflows:
                 -c "Add :CFBundleShortVersionString string 1.0" \
                 -c "Add :CFBundleVersion string 1" \
                 -c "Add :MinimumOSVersion string 15.0" \
-                "$fw/Info.plist" && echo "  Done: $fw/Info.plist"
+                "$fw/Info.plist" && echo "  → Done"
             else
-              echo "Info.plist already present: $fw"
+              echo "  → Already has Info.plist"
             fi
           done
+          echo "Engine cache patch complete (found $FOUND framework(s))"
 
       - name: Generate Hive adapters (build_runner)
         script: dart run build_runner build --delete-conflicting-outputs
@@ -56,6 +64,31 @@ workflows:
             exit 1
           fi
           echo "=== Flutter migrations complete. ==="
+
+      - name: Fix Flutter.framework Info.plist in ios/Flutter (post-assemble, Xcode 26+)
+        script: |
+          # flutter build ios --no-codesign (above) runs flutter assemble which symlinks or
+          # copies Flutter.xcframework into ios/Flutter/. Patch the framework slices here so
+          # the Info.plist is present when flutter build ipa archives.
+          echo "=== Searching ios/Flutter for Flutter.framework slices ==="
+          find ios/Flutter -name "Flutter.framework" -type d 2>/dev/null | while IFS= read -r fw; do
+            echo "Found: $fw"
+            if [ ! -f "$fw/Info.plist" ]; then
+              echo "  → Injecting Info.plist"
+              /usr/libexec/PlistBuddy \
+                -c "Add :CFBundleExecutable string Flutter" \
+                -c "Add :CFBundleIdentifier string io.flutter.flutter" \
+                -c "Add :CFBundleInfoDictionaryVersion string 6.0" \
+                -c "Add :CFBundleName string Flutter" \
+                -c "Add :CFBundlePackageType string FMWK" \
+                -c "Add :CFBundleShortVersionString string 1.0" \
+                -c "Add :CFBundleVersion string 1" \
+                -c "Add :MinimumOSVersion string 15.0" \
+                "$fw/Info.plist" && echo "  → Done: $fw/Info.plist"
+            else
+              echo "  → Already has Info.plist"
+            fi
+          done
 
       - name: Re-apply code signing after Flutter migrations
         script: |
