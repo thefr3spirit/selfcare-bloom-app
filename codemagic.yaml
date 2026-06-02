@@ -19,39 +19,38 @@ workflows:
       - name: Get Flutter dependencies
         script: flutter pub get
 
-      - name: Precache Flutter iOS engine + fix Info.plist in engine cache (Xcode 26+)
+      - name: Precache Flutter iOS engine + patch Info.plist in engine cache (Xcode 26+)
         script: |
           flutter precache --ios
-          # Use Generated.xcconfig for the authoritative FLUTTER_ROOT path.
-          # (which flutter returns a symlink; dirname/dirname of the symlink is wrong)
           FLUTTER_SDK=$(grep "^FLUTTER_ROOT=" ios/Flutter/Generated.xcconfig | cut -d= -f2-)
-          echo "Flutter SDK from Generated.xcconfig: $FLUTTER_SDK"
+          echo "Flutter SDK: ${FLUTTER_SDK:-NOT FOUND}"
           if [ -z "$FLUTTER_SDK" ]; then
-            FLUTTER_SDK=$(dirname $(dirname $(realpath $(which flutter) 2>/dev/null || readlink $(which flutter) || which flutter)))
+            FLUTTER_SDK=$(dirname $(dirname $(realpath $(which flutter) 2>/dev/null || which flutter)))
             echo "Flutter SDK (fallback): $FLUTTER_SDK"
           fi
-          FOUND=0
-          find "$FLUTTER_SDK/bin/cache/artifacts/engine" -name "Flutter.framework" -type d 2>/dev/null | while IFS= read -r fw; do
-            FOUND=$((FOUND+1))
-            echo "Found: $fw"
+
+          # Write a known-good Info.plist to a temp file (avoids heredoc/YAML indentation issues)
+          printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict>\n  <key>CFBundleExecutable</key><string>Flutter</string>\n  <key>CFBundleIdentifier</key><string>io.flutter.flutter</string>\n  <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>\n  <key>CFBundleName</key><string>Flutter</string>\n  <key>CFBundlePackageType</key><string>FMWK</string>\n  <key>CFBundleShortVersionString</key><string>1.0</string>\n  <key>CFBundleVersion</key><string>1</string>\n  <key>MinimumOSVersion</key><string>15.0</string>\n</dict></plist>\n' > /tmp/flutter_info.plist
+          echo "Template plist: $(wc -c < /tmp/flutter_info.plist) bytes"
+
+          # find -L follows symlinks — critical because engine cache may use symlinked dirs
+          echo "=== Scanning engine cache (following symlinks) ==="
+          find -L "$FLUTTER_SDK/bin/cache/artifacts/engine" -name "Flutter.framework" -type d 2>/dev/null > /tmp/fw_list.txt
+          echo "Found $(wc -l < /tmp/fw_list.txt | tr -d ' ') Flutter.framework(s):"
+          cat /tmp/fw_list.txt
+
+          while IFS= read -r fw; do
+            echo "--- $fw"
+            ls "$fw/" 2>/dev/null | head -5
             if [ ! -f "$fw/Info.plist" ]; then
-              echo "  → Injecting Info.plist"
-              chmod -R u+w "$fw"
-              /usr/libexec/PlistBuddy \
-                -c "Add :CFBundleExecutable string Flutter" \
-                -c "Add :CFBundleIdentifier string io.flutter.flutter" \
-                -c "Add :CFBundleInfoDictionaryVersion string 6.0" \
-                -c "Add :CFBundleName string Flutter" \
-                -c "Add :CFBundlePackageType string FMWK" \
-                -c "Add :CFBundleShortVersionString string 1.0" \
-                -c "Add :CFBundleVersion string 1" \
-                -c "Add :MinimumOSVersion string 15.0" \
-                "$fw/Info.plist" && echo "  → Done"
+              chmod u+w "$fw" && echo "  chmod OK" || echo "  chmod FAILED (continuing)"
+              cp /tmp/flutter_info.plist "$fw/Info.plist" && echo "  PATCHED" || echo "  WRITE FAILED"
+              [ -f "$fw/Info.plist" ] && echo "  VERIFIED: $(wc -c < "$fw/Info.plist") bytes" || echo "  ERROR: file missing after write!"
             else
-              echo "  → Already has Info.plist"
+              echo "  Already has Info.plist"
             fi
-          done
-          echo "Engine cache patch complete (found $FOUND framework(s))"
+          done < /tmp/fw_list.txt
+          echo "=== Engine cache patch complete ==="
 
       - name: Generate Hive adapters (build_runner)
         script: dart run build_runner build --delete-conflicting-outputs
@@ -66,31 +65,26 @@ workflows:
           fi
           echo "=== Flutter migrations complete. ==="
 
-      - name: Fix Flutter.framework Info.plist in ios/Flutter (post-assemble, Xcode 26+)
+      - name: Patch Info.plist in ios/Flutter (post-assemble, Xcode 26+)
         script: |
-          # flutter build ios --no-codesign (above) runs flutter assemble which symlinks or
-          # copies Flutter.xcframework into ios/Flutter/. Patch the framework slices here so
-          # the Info.plist is present when flutter build ipa archives.
-          echo "=== Searching ios/Flutter for Flutter.framework slices ==="
-          find ios/Flutter -name "Flutter.framework" -type d 2>/dev/null | while IFS= read -r fw; do
-            echo "Found: $fw"
+          # find -L follows symlinks; cp from template is more reliable than PlistBuddy
+          echo "=== Scanning ios/Flutter for Flutter.framework slices (following symlinks) ==="
+          find -L ios/Flutter -name "Flutter.framework" -type d 2>/dev/null > /tmp/ios_fw_list.txt
+          echo "Found $(wc -l < /tmp/ios_fw_list.txt | tr -d ' ') framework(s):"
+          cat /tmp/ios_fw_list.txt
+
+          while IFS= read -r fw; do
+            echo "--- $fw"
+            ls "$fw/" 2>/dev/null | head -5
             if [ ! -f "$fw/Info.plist" ]; then
-              echo "  → Injecting Info.plist"
-              chmod -R u+w "$fw"
-              /usr/libexec/PlistBuddy \
-                -c "Add :CFBundleExecutable string Flutter" \
-                -c "Add :CFBundleIdentifier string io.flutter.flutter" \
-                -c "Add :CFBundleInfoDictionaryVersion string 6.0" \
-                -c "Add :CFBundleName string Flutter" \
-                -c "Add :CFBundlePackageType string FMWK" \
-                -c "Add :CFBundleShortVersionString string 1.0" \
-                -c "Add :CFBundleVersion string 1" \
-                -c "Add :MinimumOSVersion string 15.0" \
-                "$fw/Info.plist" && echo "  → Done: $fw/Info.plist"
+              chmod u+w "$fw" && echo "  chmod OK" || echo "  chmod FAILED (continuing)"
+              cp /tmp/flutter_info.plist "$fw/Info.plist" && echo "  PATCHED" || echo "  WRITE FAILED"
+              [ -f "$fw/Info.plist" ] && echo "  VERIFIED: $(wc -c < "$fw/Info.plist") bytes" || echo "  ERROR: file missing after write!"
             else
-              echo "  → Already has Info.plist"
+              echo "  Already has Info.plist"
             fi
-          done
+          done < /tmp/ios_fw_list.txt
+          echo "=== ios/Flutter patch complete ==="
 
       - name: Re-apply code signing after Flutter migrations
         script: |
@@ -106,17 +100,21 @@ workflows:
           cat /Users/builder/export_options.plist
 
           echo "=== Archiving ==="
+          # -derivedDataPath forces a FRESH build directory so xcodebuild re-processes
+          # Flutter.xcframework from scratch (uses our patched copy with Info.plist),
+          # rather than reusing DerivedData built by the earlier flutter build --no-codesign
+          # step which ran before we patched the framework.
           xcodebuild archive \
             -workspace ios/Runner.xcworkspace \
             -scheme Runner \
             -sdk iphoneos \
             -configuration Release \
             -archivePath /tmp/Runner.xcarchive \
+            -derivedDataPath /tmp/xcodebuild_derived_data \
             CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM=C26VK7Y2WB \
             PROVISIONING_PROFILE_SPECIFIER=newselfcare \
             CODE_SIGN_IDENTITY="Apple Distribution" \
-            VALIDATE_PRODUCT=NO \
             | xcpretty --color || {
               echo "=== xcodebuild archive FAILED — raw errors ==="
               xcodebuild archive \
@@ -125,11 +123,11 @@ workflows:
                 -sdk iphoneos \
                 -configuration Release \
                 -archivePath /tmp/Runner.xcarchive \
+                -derivedDataPath /tmp/xcodebuild_derived_data \
                 CODE_SIGN_STYLE=Manual \
                 DEVELOPMENT_TEAM=C26VK7Y2WB \
                 PROVISIONING_PROFILE_SPECIFIER=newselfcare \
-                CODE_SIGN_IDENTITY="Apple Distribution" \
-                VALIDATE_PRODUCT=NO 2>&1 | grep -iE "error:|warning:.*error|no profile|code sign|archive failed" | head -60
+                CODE_SIGN_IDENTITY="Apple Distribution" 2>&1 | grep -iE "error:|warning:.*error|no profile|code sign|archive failed" | head -60
               exit 1
             }
 
