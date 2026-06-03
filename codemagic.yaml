@@ -149,6 +149,11 @@ workflows:
               exit 1
             }
 
+          echo "=== Stripping embedded.mobileprovision from frameworks in archive ==="
+          find /tmp/Runner.xcarchive -path "*/Frameworks/*.framework/embedded.mobileprovision" -print -delete
+          find /tmp/Runner.xcarchive -path "*/PlugIns/*.appex/embedded.mobileprovision" -print -delete
+          echo "Strip complete"
+
           echo "=== Exporting IPA ==="
           mkdir -p build/ios/ipa
           xcodebuild -exportArchive \
