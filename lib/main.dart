@@ -126,8 +126,12 @@ class _AppInitializerState extends State<AppInitializer> {
     final prefs = await SharedPreferences.getInstance();
     _onboardingComplete = prefs.getBool('onboarding_complete') ?? false;
 
-    // Check authentication status
-    _isAuthenticated = FirebaseService.isSignedIn();
+    // Check authentication status (guard against Firebase not being initialized)
+    try {
+      _isAuthenticated = FirebaseService.isSignedIn();
+    } catch (_) {
+      _isAuthenticated = false;
+    }
 
     // Check local storage first
     var user = _storage.getUserProfile();

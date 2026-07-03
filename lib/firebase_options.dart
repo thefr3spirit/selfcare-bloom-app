@@ -26,10 +26,7 @@ class DefaultFirebaseOptions {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for ios - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return ios;
       case TargetPlatform.macOS:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for macos - '
@@ -58,5 +55,16 @@ class DefaultFirebaseOptions {
     messagingSenderId: '886791280277',
     projectId: 'selfcare-bloom',
     storageBucket: 'selfcare-bloom.firebasestorage.app',
+  );
+
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'AIzaSyBmP4W0SUXMxTrW8Cir-WuONkNjP2m_IG4',
+    appId: '1:886791280277:ios:e887f4c4db7f04e127ed9c',
+    messagingSenderId: '886791280277',
+    projectId: 'selfcare-bloom',
+    storageBucket: 'selfcare-bloom.firebasestorage.app',
+    iosClientId:
+        '886791280277-k9og08elmimjke8fqoflj40qoed0dhml.apps.googleusercontent.com',
+    iosBundleId: 'com.selfcarebloom.app',
   );
 }
