@@ -101,6 +101,7 @@ class NotificationService {
 
   /// Schedule one-time reminder after specific days
   static Future<void> scheduleReminderAfterDays(int days) async {
+    if (!_initialized) return; // Skip if plugin not initialized (FCM handles notifications)
     try {
       final scheduledDate = DateTime.now().add(Duration(days: days));
       final tzScheduledDate = tz.TZDateTime.from(scheduledDate, tz.local);

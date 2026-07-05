@@ -144,7 +144,7 @@ class FirestoreService {
             .collection('users')
             .doc(_userId)
             .collection('stressors')
-            .doc('${assessmentId}_${stressor.type}');
+            .doc('${assessmentId}_${stressor.type.replaceAll('/', '_')}');
 
         batch.set(docRef, {
           'assessmentId': assessmentId,
@@ -202,7 +202,7 @@ class FirestoreService {
             .collection('users')
             .doc(_userId)
             .collection('coping_strategies')
-            .doc('${assessmentId}_${strategy.name}');
+            .doc('${assessmentId}_${strategy.name.replaceAll('/', '_')}');
 
         batch.set(docRef, {
           'assessmentId': assessmentId,

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart' hide FirebaseService;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -18,8 +20,16 @@ import 'theme/app_theme.dart';
 import 'theme/theme_provider.dart';
 
 void main() async {
+  runZonedGuarded(() async {
   // Ensure Flutter is initialized
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Catch all Flutter framework errors (including build errors)
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    debugPrint('Flutter error: ${details.exception}');
+    debugPrint('Stack: ${details.stack}');
+  };
 
   // Initialize Firebase
   try {
@@ -60,6 +70,11 @@ void main() async {
   await ThemeNotifier.instance.initialize();
 
   runApp(const SelfCareTogetherApp());
+  }, (Object error, StackTrace stack) {
+    // Catch ALL unhandled async/zone errors — prevents silent native crash
+    debugPrint('Unhandled zone error: $error');
+    debugPrint('Stack trace: $stack');
+  });
 }
 
 class SelfCareTogetherApp extends StatelessWidget {

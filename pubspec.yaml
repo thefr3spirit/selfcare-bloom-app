@@ -1,7 +1,7 @@
 name: selfcare_together
 description: Offline-first stress management app for mental health pilot study
 publish_to: 'none'
-version: 1.0.0+8
+version: 1.0.0+14
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

@@ -494,7 +494,7 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
       child: SizedBox(
         width: double.infinity,
         child: FilledButton.icon(
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Navigator.of(context).pop(true),
           icon: const Icon(Icons.check_circle_outline),
           label: const Text(
             'Done — Back to Home',

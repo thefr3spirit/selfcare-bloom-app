@@ -184,16 +184,15 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
       await _storage.clearAllRecommendations();
       await _storage.saveRecommendations(recommendations);
 
-      // Navigate to recommendations, then return true when complete
+      // Replace assessment screen with recommendations screen.
+      // RecommendationsScreen will pop with result=true back to HomeScreen.
       if (mounted) {
-        await Navigator.push(
+        setState(() => _isSubmitting = false);
+        Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const RecommendationsScreen()),
         );
-        // After viewing recommendations, pop back with success result
-        if (mounted) {
-          Navigator.pop(context, true);
-        }
+        return;
       }
     } catch (e) {
       if (mounted) {
@@ -202,7 +201,8 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
         );
       }
     } finally {
-      if (mounted) {
+      // Only reset if still on this screen (not navigated away)
+      if (mounted && _isSubmitting) {
         setState(() => _isSubmitting = false);
       }
     }
@@ -368,7 +368,9 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
           ),
 
           // Navigation buttons
-          Container(
+          SafeArea(
+            top: false,
+            child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white,
@@ -415,6 +417,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
               ],
             ),
           ),
+          ), // SafeArea
         ],
       ),
     );
