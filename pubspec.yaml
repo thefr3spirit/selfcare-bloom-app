@@ -17,6 +17,8 @@ dependencies:
   firebase_messaging: ^16.0.0
   cloud_functions: ^6.0.0
   google_sign_in: ^6.2.1
+  sign_in_with_apple: ^6.1.4
+  crypto: ^3.0.3
   
   # Local Storage
   hive: ^2.2.3

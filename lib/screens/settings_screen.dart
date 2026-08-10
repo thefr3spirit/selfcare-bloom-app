@@ -25,6 +25,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (user == null) return;
 
     final isGoogle = user.providerData.any((p) => p.providerId == 'google.com');
+    final isApple = user.providerData.any((p) => p.providerId == 'apple.com');
     final isAnonymous = user.isAnonymous;
 
     // Step 1: Confirm dialog
@@ -55,7 +56,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     // Step 2: Re-auth for email/password users
     String password = '';
-    if (!isAnonymous && !isGoogle) {
+    if (!isAnonymous && !isGoogle && !isApple) {
       final passwordController = TextEditingController();
       final entered = await showDialog<bool>(
         context: context,
@@ -90,6 +91,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       if (isGoogle) {
         await FirebaseService.deleteGoogleAccount();
+      } else if (isApple) {
+        await FirebaseService.deleteAppleAccount();
       } else {
         await FirebaseService.deleteAccount(password);
       }

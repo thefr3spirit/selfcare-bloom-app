@@ -1,4 +1,7 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../services/firebase_push_service.dart';
 import '../../services/firebase_service.dart';
@@ -139,6 +142,55 @@ class _RegisterScreenState extends State<RegisterScreen> {
         final hasConsented = userProfile?.hasConsented ?? false;
 
         // Navigate to appropriate screen
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => hasConsented
+                ? const MainNavigationScreen()
+                : const SimplifiedConsentScreen(),
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = _getFriendlyErrorMessage(e.toString());
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _handleAppleSignIn() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final user = await FirebaseService.signInWithApple();
+
+      if (user != null && mounted) {
+        // Store FCM token for push notifications
+        await FirebasePushService.storeFCMToken();
+
+        // Perform initial cloud sync (non-blocking)
+        FirestoreService.performInitialSync().catchError((e) {
+          debugPrint('Initial sync failed: $e');
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Signed in with Apple successfully! 🎉'),
+            backgroundColor: AppTheme.success,
+          ),
+        );
+
+        final storage = StorageService();
+        final userProfile = storage.getUserProfile();
+        final hasConsented = userProfile?.hasConsented ?? false;
+
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -459,7 +511,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 12),
+
+                    // Apple Sign-In (required alongside other third-party
+                    // login options per App Store Review Guideline 4.8)
+                    if (Platform.isIOS) ...[
+                      SignInWithAppleButton(
+                        onPressed: _isLoading ? () {} : _handleAppleSignIn,
+                        style: SignInWithAppleButtonStyle.black,
+                        borderRadius: BorderRadius.circular(12),
+                        height: 48,
+                      ),
+                      const SizedBox(height: 12),
+                    ],
 
                     // Already have account link
                     Row(

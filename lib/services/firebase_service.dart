@@ -1,7 +1,12 @@
+import 'dart:convert';
+import 'dart:math';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 /// Firebase Authentication and Firestore Service
 /// Handles user authentication and cloud data sync
@@ -158,6 +163,93 @@ class FirebaseService {
     }
   }
 
+  /// Generates a cryptographically secure random nonce for Apple Sign-In.
+  static String _generateNonce([int length = 32]) {
+    const charset =
+        '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
+    final random = Random.secure();
+    return List.generate(length, (_) => charset[random.nextInt(charset.length)])
+        .join();
+  }
+
+  static String _sha256ofString(String input) {
+    final bytes = utf8.encode(input);
+    return sha256.convert(bytes).toString();
+  }
+
+  /// Sign in with Apple
+  static Future<User?> signInWithApple() async {
+    try {
+      // Generate a random nonce and its SHA-256 hash. The raw nonce is sent
+      // to Firebase, while the hashed nonce is sent to Apple — this proves
+      // the ID token was requested by this app and not replayed by an attacker.
+      final rawNonce = _generateNonce();
+      final hashedNonce = _sha256ofString(rawNonce);
+
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+        nonce: hashedNonce,
+      );
+
+      final oauthCredential = OAuthProvider('apple.com').credential(
+        idToken: appleCredential.identityToken,
+        rawNonce: rawNonce,
+        accessToken: appleCredential.authorizationCode,
+      );
+
+      final userCredential = await _auth.signInWithCredential(oauthCredential);
+      final user = userCredential.user;
+
+      if (user != null) {
+        // Apple only ever provides the user's name on the very first
+        // sign-in, so capture it now before it's lost for good.
+        final appleFullName = [
+          appleCredential.givenName,
+          appleCredential.familyName,
+        ].where((s) => s != null && s.isNotEmpty).join(' ');
+
+        if (appleFullName.isNotEmpty &&
+            (user.displayName == null || user.displayName!.isEmpty)) {
+          await user.updateDisplayName(appleFullName);
+          await user.reload();
+        }
+
+        final userDoc = _firestore.collection('users').doc(user.uid);
+        final docSnapshot = await userDoc.get();
+
+        if (!docSnapshot.exists) {
+          await userDoc.set({
+            'email': user.email ?? appleCredential.email ?? '',
+            'displayName': user.displayName ?? appleFullName,
+            'photoURL': user.photoURL ?? '',
+            'createdAt': FieldValue.serverTimestamp(),
+            'totalAssessments': 0,
+            'isAnonymous': false,
+            'authProvider': 'apple',
+            'notificationPreferences': {
+              'dailyReminder': true,
+              'weeklyReport': true,
+              'achievementUnlocks': true,
+            },
+          });
+        } else {
+          await userDoc.update({
+            'lastLogin': FieldValue.serverTimestamp(),
+          });
+        }
+      }
+
+      debugPrint('Signed in with Apple: ${user?.uid}');
+      return user;
+    } catch (e) {
+      debugPrint('Apple sign-in failed: $e');
+      rethrow;
+    }
+  }
+
   /// Send password reset email
   static Future<void> sendPasswordResetEmail(String email) async {
     try {
@@ -277,6 +369,48 @@ class FirebaseService {
       debugPrint('Failed to delete Google account: $e');
       rethrow;
     }
+  }
+
+  /// Delete user account (Apple sign-in)
+  static Future<void> deleteAppleAccount() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return;
+
+      // Re-authenticate with Apple before deletion
+      final rawNonce = _generateNonce();
+      final hashedNonce = _sha256ofString(rawNonce);
+
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+        nonce: hashedNonce,
+      );
+
+      final oauthCredential = OAuthProvider('apple.com').credential(
+        idToken: appleCredential.identityToken,
+        rawNonce: rawNonce,
+        accessToken: appleCredential.authorizationCode,
+      );
+      await user.reauthenticateWithCredential(oauthCredential);
+
+      await _deleteUserData(user.uid);
+      await user.delete();
+      debugPrint('Apple account deleted successfully');
+    } catch (e) {
+      debugPrint('Failed to delete Apple account: $e');
+      rethrow;
+    }
+  }
+
+  /// Which provider the current user signed in with: 'apple.com', 'google.com',
+  /// 'password', or null if signed in anonymously / not signed in.
+  static String? getAuthProviderId() {
+    final user = _auth.currentUser;
+    if (user == null || user.providerData.isEmpty) return null;
+    return user.providerData.first.providerId;
   }
 
   /// Delete all Firestore data for a user

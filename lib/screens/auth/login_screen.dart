@@ -1,4 +1,7 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../models/user_profile.dart';
 import '../../services/firebase_push_service.dart';
@@ -114,6 +117,37 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final user = await FirebaseService.signInWithGoogle();
+
+      if (user != null && mounted) {
+        // Store FCM token for push notifications
+        await FirebasePushService.storeFCMToken();
+
+        // Perform initial cloud sync (non-blocking)
+        FirestoreService.performInitialSync().catchError((e) {
+          debugPrint('Initial sync failed: $e');
+        });
+
+        await _navigateAfterAuth();
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = _getFriendlyErrorMessage(e.toString());
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _handleAppleSignIn() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final user = await FirebaseService.signInWithApple();
 
       if (user != null && mounted) {
         // Store FCM token for push notifications
@@ -410,6 +444,18 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
+
+                      // Apple Sign-In (required alongside other third-party
+                      // login options per App Store Review Guideline 4.8)
+                      if (Platform.isIOS) ...[
+                        SignInWithAppleButton(
+                          onPressed: _isLoading ? () {} : _handleAppleSignIn,
+                          style: SignInWithAppleButtonStyle.black,
+                          borderRadius: BorderRadius.circular(12),
+                          height: 48,
+                        ),
+                        const SizedBox(height: 12),
+                      ],
 
                       // Anonymous login
                       OutlinedButton.icon(

@@ -193,9 +193,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (confirmed != true) return;
 
-    // Get password if not anonymous
+    // Re-authentication differs by how the user originally signed in.
+    final providerId = FirebaseService.getAuthProviderId();
+
     String? password;
-    if (!FirebaseService.isAnonymous()) {
+    if (providerId == 'password') {
       final passwordController = TextEditingController();
       final passwordResult = await showDialog<String>(
         context: context,
@@ -229,7 +231,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await FirebaseService.deleteAccount(password ?? '');
+      switch (providerId) {
+        case 'google.com':
+          await FirebaseService.deleteGoogleAccount();
+          break;
+        case 'apple.com':
+          await FirebaseService.deleteAppleAccount();
+          break;
+        default:
+          // 'password' or anonymous (null)
+          await FirebaseService.deleteAccount(password ?? '');
+      }
 
       if (mounted) {
         Navigator.pushAndRemoveUntil(
