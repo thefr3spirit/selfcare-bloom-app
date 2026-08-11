@@ -551,7 +551,7 @@ class AlgorithmService {
 
     return Recommendation(
       recommendationId:
-          '${stressor.type.toLowerCase().replaceAll(' ', '_')}_${DateTime.now().millisecondsSinceEpoch}',
+          '${stressor.type.toLowerCase().replaceAll('/', '_').replaceAll(' ', '_')}_${DateTime.now().millisecondsSinceEpoch}',
       generatedAt: DateTime.now(),
       type: 'STRESSOR_INTERVENTION',
       priorityScore: 0,

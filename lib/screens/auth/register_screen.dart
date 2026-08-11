@@ -81,10 +81,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         );
 
-        // New users haven't consented yet, navigate to consent screen
-        Navigator.pushReplacement(
+        // New users haven't consented yet, navigate to consent screen.
+        // Use pushAndRemoveUntil (not pushReplacement) to also clear
+        // LoginScreen, which is still under RegisterScreen in the stack —
+        // otherwise Home ends up with a back arrow to the login page.
+        Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => const SimplifiedConsentScreen()),
+          (route) => false,
         );
       }
     } catch (e) {
@@ -141,14 +145,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
         final userProfile = storage.getUserProfile();
         final hasConsented = userProfile?.hasConsented ?? false;
 
-        // Navigate to appropriate screen
-        Navigator.pushReplacement(
+        // Navigate to appropriate screen. Use pushAndRemoveUntil (not
+        // pushReplacement) to also clear LoginScreen, still under
+        // RegisterScreen in the stack, or Home ends up with a back arrow.
+        Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(
             builder: (_) => hasConsented
                 ? const MainNavigationScreen()
                 : const SimplifiedConsentScreen(),
           ),
+          (route) => false,
         );
       }
     } catch (e) {
@@ -191,13 +198,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
         final userProfile = storage.getUserProfile();
         final hasConsented = userProfile?.hasConsented ?? false;
 
-        Navigator.pushReplacement(
+        Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(
             builder: (_) => hasConsented
                 ? const MainNavigationScreen()
                 : const SimplifiedConsentScreen(),
           ),
+          (route) => false,
         );
       }
     } catch (e) {
