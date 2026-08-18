@@ -111,17 +111,14 @@ We automatically collect:
             _buildSection(
               '3. Data Storage & Security',
               '''3.1 Where We Store Your Data:
-• Local Storage: Encrypted Hive database on your device
+• Local Storage: Hive database on your device
 • Cloud Storage: Google Firebase servers (US data centers)
-• Backups: Encrypted daily backups on Firebase
 
 3.2 Security Measures:
-• End-to-end encryption for data in transit (TLS/SSL)
-• AES-256 encryption for data at rest
+• Encryption in transit (TLS/SSL) for all data sent to our servers
 • Secure authentication via Firebase Auth
-• Role-based access controls
-• Regular security audits and penetration testing
-• Automatic security updates
+• Firestore security rules restrict access to your own data
+• Automatic security updates from our infrastructure providers
 
 3.3 Data Retention:
 • Active accounts: Data retained while account is active
@@ -139,8 +136,6 @@ We may share data with:
 4.1 Service Providers:
 • Google Firebase (hosting, authentication, storage)
 • Google Cloud Functions (push notifications)
-• Cloud storage providers (encrypted backups)
-• Analytics services (anonymized data only)
 
 These providers are contractually bound to protect your data and use it only for specified services.
 
@@ -254,17 +249,11 @@ We ensure appropriate safeguards through:
 • Session management
 • Security features
 
-9.2 Analytics:
-• Firebase Analytics (anonymized usage data)
-• Crash reporting (error logs)
-• Performance monitoring
-
-9.3 Not Used:
+9.2 Not Used:
+• Analytics, crash reporting, or performance monitoring tools
 • Advertising cookies (we don't show ads)
 • Third-party tracking for marketing
-• Cross-site tracking
-
-You can disable non-essential tracking in Settings > Privacy.''',
+• Cross-site tracking''',
             ),
             _buildSection(
               '10. Third-Party Services',
@@ -275,7 +264,6 @@ You can disable non-essential tracking in Settings > Privacy.''',
 • Cloud Firestore
 • Firebase Cloud Functions
 • Firebase Cloud Messaging
-• Firebase Analytics
 
 Review Firebase's privacy policy at: 
 https://firebase.google.com/support/privacy
@@ -318,10 +306,6 @@ Contact our security team: security@selfcarebloom.com''',
 Email: privacy@selfcarebloom.com
 Support: support@selfcarebloom.com
 Website: www.selfcarebloom.com/privacy
-Mail: [Your Business Address]
-
-Data Protection Officer: [Name]
-DPO Email: dpo@selfcarebloom.com
 
 Response time: Within 30 days (or as required by law)
 

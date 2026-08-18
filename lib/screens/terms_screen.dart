@@ -215,8 +215,7 @@ Continued use of the App after changes constitutes acceptance of the modified Te
 
 13.2 Binding Arbitration:
 • Disputes will be resolved through arbitration
-• Arbitration is conducted under [Arbitration Rules]
-• Location: [Your jurisdiction]
+• Arbitration is conducted in the jurisdiction specified in Section 14 (Governing Law)
 • Class action waiver applies
 
 13.3 Exceptions:
@@ -226,9 +225,9 @@ Continued use of the App after changes constitutes acceptance of the modified Te
             ),
             _buildSection(
               '14. Governing Law',
-              '''These Terms are governed by and construed in accordance with the laws of [Your Jurisdiction/Kenya/Uganda], without regard to conflict of law principles.
+              '''These Terms are governed by and construed in accordance with the laws of Uganda and Kenya, without regard to conflict of law principles.
 
-Any legal action or proceeding shall be brought exclusively in the courts located in [Your Jurisdiction].''',
+Any legal action or proceeding shall be brought exclusively in the courts located in Uganda or Kenya, whichever jurisdiction the user resides in.''',
             ),
             _buildSection(
               '15. Severability',
@@ -244,7 +243,6 @@ Any legal action or proceeding shall be brought exclusively in the courts locate
 
 Email: support@selfcarebloom.com
 Website: www.selfcarebloom.com
-Address: [Your Business Address]
 
 Response time: Within 2-3 business days''',
             ),
