@@ -23,6 +23,9 @@ jobs:
       - name: Install Flutter dependencies
         run: flutter pub get
 
+      - name: Generate Hive adapters (build_runner)
+        run: flutter pub run build_runner build --delete-conflicting-outputs
+
       - name: Install CocoaPods dependencies
         working-directory: ios
         run: pod install --repo-update
