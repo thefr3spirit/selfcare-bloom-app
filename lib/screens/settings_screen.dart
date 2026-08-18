@@ -6,6 +6,7 @@ import '../theme/app_theme.dart';
 import '../theme/theme_provider.dart';
 import 'auth/login_screen.dart';
 import 'privacy_policy_screen.dart';
+import 'sources_screen.dart';
 import 'terms_screen.dart';
 
 /// Settings screen - simplified from profile screen
@@ -302,6 +303,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: 'About App',
                   subtitle: 'Version, credits, and information',
                   onTap: _showAboutDialog,
+                ),
+                const Divider(height: 1, indent: 72),
+                _buildListTile(
+                  icon: Icons.menu_book_outlined,
+                  title: 'Sources & References',
+                  subtitle: 'Citations for the health information in the app',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const SourcesScreen(),
+                    ),
+                  ),
                 ),
               ],
             ),

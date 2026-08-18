@@ -1059,7 +1059,7 @@ class AlgorithmService {
         '💡 Video guide: https://youtube.com/watch?v=30VMIEmA114',
       ],
       evidenceBasis:
-          'Mindfulness-based grounding reduces anxiety by 40% immediately',
+          'Sensory grounding techniques help redirect attention and ease acute anxiety',
       resources: [
         'Grounding techniques: https://youtube.com/watch?v=30VMIEmA114'
       ],
@@ -1137,7 +1137,7 @@ class AlgorithmService {
         '💡 Tip: Do this daily before bed',
       ],
       evidenceBasis:
-          'Gratitude practice reduces stress hormones and improves sleep quality',
+          'Practicing gratitude is linked to greater wellbeing and lower stress',
       resources: [
         'Science of gratitude: https://positivepsychology.com/gratitude-research/'
       ],
@@ -1162,7 +1162,7 @@ class AlgorithmService {
         'Set a 5-minute timer',
         '💡 Aim for one walk break per day',
       ],
-      evidenceBasis: 'Short walks reduce stress by 15% and improve focus',
+      evidenceBasis: 'Even brief walks can lower stress and improve focus',
       resources: [
         'Walking benefits: https://www.health.harvard.edu/staying-healthy/5-surprising-benefits-of-walking'
       ],
@@ -1245,7 +1245,7 @@ class AlgorithmService {
         '💡 Audio guide: https://youtube.com/watch?v=ihO02wUzgkc',
       ],
       evidenceBasis:
-          'Guided imagery reduces cortisol and lowers blood pressure',
+          'Guided imagery is a relaxation technique that can lower stress and support calm',
       resources: ['Guided imagery: https://youtube.com/watch?v=ihO02wUzgkc'],
     );
   }
@@ -1271,7 +1271,7 @@ class AlgorithmService {
         'Repeat daily for best results',
       ],
       evidenceBasis:
-          'Self-affirmation activates brain reward centers and reduces stress',
+          'Self-affirmation is associated with reduced stress and better coping',
       resources: [
         'Affirmations guide: https://positivepsychology.com/daily-affirmations/'
       ],

@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../data/citations.dart';
 import '../models/recommendation.dart';
 import '../models/recommendation_feedback.dart';
 import '../services/firebase_service.dart';
@@ -9,6 +10,7 @@ import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/empty_state_widget.dart';
 import '../widgets/loading_widget.dart';
+import 'sources_screen.dart';
 
 /// Recommendations display screen
 class RecommendationsScreen extends StatefulWidget {
@@ -55,6 +57,16 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
             Navigator.pop(context);
           },
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.menu_book_outlined),
+            tooltip: 'Sources & References',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SourcesScreen()),
+            ),
+          ),
+        ],
       ),
       body: _isLoading
           ? const LoadingWidget(message: 'Loading your recommendations...')
@@ -153,6 +165,21 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 12),
+            InkWell(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SourcesScreen()),
+              ),
+              child: const Text(
+                'Source: Perceived Stress Scale (Cohen et al., 1983) ↗',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  color: AppTheme.info,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
             ),
           ],
         ),
@@ -311,6 +338,7 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
                     ),
                   ],
                 ),
+                _buildCitationLine(context, rec),
 
                 if (rec.actions.isNotEmpty) ...[
                   const SizedBox(height: 16),
@@ -357,7 +385,7 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
                   }),
                 ],
 
-                // Resources (for crisis recommendations)
+                // Resources (crisis hotlines or helpful how-to links)
                 if (rec.resources != null && rec.resources!.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   Container(
@@ -370,13 +398,20 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Row(
+                        Row(
                           children: [
-                            Icon(Icons.phone, color: Colors.amber),
-                            SizedBox(width: 8),
+                            Icon(
+                              rec.isCrisisRecommendation
+                                  ? Icons.phone
+                                  : Icons.link,
+                              color: Colors.amber.shade800,
+                            ),
+                            const SizedBox(width: 8),
                             Text(
-                              'Crisis Resources',
-                              style: TextStyle(
+                              rec.isCrisisRecommendation
+                                  ? 'Crisis Resources'
+                                  : 'Helpful Resources',
+                              style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -535,6 +570,70 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
       default:
         return Icons.lightbulb;
     }
+  }
+
+  /// Shows a tappable link to the external source backing this
+  /// recommendation's technique, plus a disclosure when the specific
+  /// point-value estimate comes from our own pilot study rather than
+  /// external published research.
+  Widget _buildCitationLine(BuildContext context, Recommendation rec) {
+    final citation = citationFor(rec);
+    final pilotDerived = isPilotDerived(rec);
+
+    if (citation == null && !pilotDerived) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 6, left: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (citation != null)
+            InkWell(
+              onTap: () async {
+                final uri = Uri.parse(citation.url);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              },
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.open_in_new, size: 12, color: AppTheme.info),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text(
+                      'Source: ${citation.label}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppTheme.info,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (pilotDerived)
+            Padding(
+              padding: EdgeInsets.only(top: citation != null ? 2 : 0),
+              child: InkWell(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SourcesScreen()),
+                ),
+                child: const Text(
+                  'This figure is from our own pilot study (n=50), not external research. Details ↗',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontStyle: FontStyle.italic,
+                    color: Colors.grey,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   /// Build text with clickable URLs
