@@ -8,16 +8,22 @@ Repo: `https://github.com/thefr3spirit/selfcare-bloom-app` (branch `main`).
 
 ## Cross-device workflow
 
-Development happens on this Windows PC; iOS builds happen on a Mac (currently a cousin's, borrowed access) since Windows can't build/archive iOS. The loop is: edit here → commit/push → `git pull` on the Mac → build & upload to App Store Connect from Xcode. Always `git pull` at the start of a session before making changes, and push when done so the Mac side can pick it up.
+Development happens on this Windows PC. iOS builds **used to** happen on a cousin's Mac, but that access is gone as of 2026-08-18 — there is no Mac in the loop anymore.
 
-**Codemagic CI was tried and abandoned** (it failed) in favor of the Mac. `codemagic.yaml` has been deleted — don't reintroduce a cloud CI pipeline unless explicitly asked.
+**iOS builds now happen via GitHub Actions** (`.github/workflows/ios-testflight.yml`), triggered manually (`workflow_dispatch` — every run attempts a real App Store Connect upload and consumes a build number, so it doesn't run on every push). It uses a hosted macOS runner + an App Store Connect API key for automatic signing (`xcodebuild -allowProvisioningUpdates -authenticationKeyPath/-authenticationKeyID/-authenticationKeyIssuerID`), so nothing needs to be exported from the old Mac's keychain. Required repo secrets: `APP_STORE_CONNECT_KEY_ID`, `APP_STORE_CONNECT_ISSUER_ID`, `APP_STORE_CONNECT_API_KEY_P8` (the raw `.p8` contents) — generate the key at App Store Connect → Users and Access → Integrations → App Store Connect API (Admin role), no Mac required.
+
+**Codemagic CI was tried once before and abandoned** (failed on an SPM build-flag error, before most of the current Podfile fixes existed). GitHub Actions was chosen instead because the repo is public, so macOS runner minutes are free/unmetered (Codemagic's free tier is capped). If the GitHub Actions workflow also turns out to be unworkable, that's the fallback to reconsider — but try to fix the workflow first.
+
+Bump `pubspec.yaml`'s build number (`+N` after `1.0.0`) past whatever Apple last reviewed before triggering a new upload — Apple rejects re-uploads at or below an already-seen build number. Check the last rejection email's "Version reviewed" line if unsure.
 
 ## iOS build/signing
 
 - `CODE_SIGN_STYLE = Automatic` in `ios/Runner.xcodeproj/project.pbxproj`, team `C26VK7Y2WB`.
-- `ExportOptions.plist` at the repo root (`signingStyle: automatic`) is what the Mac uses to archive/export. This is the only export options file that matters now.
+- `ExportOptions.plist` at the repo root (`signingStyle: automatic`, `method: app-store`) was what the Mac used to archive/export interactively — kept for reference / possible future manual use, but nothing currently reads it.
+- `ios/ExportOptions-ci.plist` is what the GitHub Actions workflow actually uses (`method: app-store-connect`, `destination: upload` — exports and uploads to App Store Connect in one `xcodebuild -exportArchive` step, no separate altool/Transporter step needed).
 - `ios/Podfile` has a heavily-customized `post_install` block (strips embedded provisioning profiles from frameworks, patches `set -u` scripts, injects `Info.plist` into `Flutter.framework` for Xcode 26+, etc.) — these were all fixes for real App Store Connect upload failures. Don't simplify/remove those without understanding why each exists (see git log for the individual `fix:` commits).
 - `ITSAppUsesNonExemptEncryption = false` is set in `ios/Runner/Info.plist` to skip the export-compliance prompt (app only uses standard TLS).
+- **Known risk, not yet hit or fixed**: automatic signing via API key can only *download* an existing distribution certificate's public half — it can't recover a private key that only ever existed in the old Mac's keychain. If the Apple Developer account is already at its certificate limit from certs created on that Mac, the CI run will fail trying to create a new one. Fix: Apple Developer Portal → Certificates → revoke old/unused iOS Distribution certs to free a slot.
 
 ## Authentication
 
@@ -35,3 +41,5 @@ Four sign-in methods: email/password, Google, **Apple**, and anonymous. Apple Si
 - Apple Sign-In code is committed and pushed; external Apple Developer Portal + Firebase config is done.
 - **Not yet verified**: no real-device/TestFlight test of the Apple sign-in + delete-account flow yet. Do that before resubmitting to App Store review.
 - `flutter analyze` is clean (only pre-existing `use_build_context_synchronously` info-level lints, same pattern used throughout the codebase — not new issues).
+- Second rejection (guideline 1.4.1, missing citations for medical/health info) has been addressed: `lib/data/citations.dart`, `lib/screens/sources_screen.dart`, citation links wired into recommendations/settings screens. Also fixed while auditing for a third rejection: a stale-PSS-score navigation bug, an account-deletion path that left local data on-device, an inaccurate Privacy Policy (claimed encryption/analytics that don't exist), leftover `[placeholder]` text in Terms/Privacy, and Uganda/Kenya-only crisis resources with no international fallback.
+- **The GitHub Actions iOS workflow (`.github/workflows/ios-testflight.yml`) has never been run** — it was written and reasoned through carefully but is untested against the real Apple Developer account/certs, since there's no Mac to cross-check against. Expect the first run(s) to need debugging from the Actions log, the same way the Podfile fixes were arrived at iteratively on the Mac. Needs the three `APP_STORE_CONNECT_*` secrets set in the repo before it can run at all.
