@@ -75,10 +75,16 @@ class CrisisResources {
       'number': '0722 178 177',
       'availability': 'Daily 9am-9pm',
     },
+    {
+      'name': 'Outside Uganda/Kenya: Find A Helpline',
+      'number': 'https://findahelpline.com',
+      'availability': '24/7, verified crisis lines in 130+ countries',
+    },
   ];
 
   static String getCrisisMessage() {
     return 'Your stress level is very high. You don\'t have to face this alone. '
-        'Please reach out for immediate support:';
+        'Please reach out for immediate support. If you are in immediate '
+        'physical danger, contact your local emergency services right away:';
   }
 }

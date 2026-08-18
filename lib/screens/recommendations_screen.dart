@@ -421,12 +421,7 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
                         ...rec.resources!.map(
                           (resource) => Padding(
                             padding: const EdgeInsets.only(bottom: 4),
-                            child: Text(
-                              resource,
-                              style: const TextStyle(
-                                fontSize: 13,
-                              ),
-                            ),
+                            child: _buildClickableText(resource),
                           ),
                         ),
                       ],
