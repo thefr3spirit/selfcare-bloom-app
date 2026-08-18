@@ -184,13 +184,18 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
       await _storage.clearAllRecommendations();
       await _storage.saveRecommendations(recommendations);
 
-      // Replace assessment screen with recommendations screen.
-      // RecommendationsScreen will pop with result=true back to HomeScreen.
+      // Replace assessment screen with recommendations screen. pushReplacement
+      // completes THIS screen's own route immediately with `result` below —
+      // it does NOT wait for RecommendationsScreen to eventually be popped.
+      // That's what lets whoever pushed AssessmentScreen (e.g. HomeScreen's
+      // `await Navigator.push(...)`) see result==true and refresh right away,
+      // instead of only refreshing on the next tab switch / app resume.
       if (mounted) {
         setState(() => _isSubmitting = false);
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const RecommendationsScreen()),
+          result: true,
         );
         return;
       }
