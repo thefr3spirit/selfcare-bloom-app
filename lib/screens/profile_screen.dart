@@ -243,6 +243,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           await FirebaseService.deleteAccount(password ?? '');
       }
 
+      await _storage.clearAllData();
+
       if (mounted) {
         Navigator.pushAndRemoveUntil(
           context,
