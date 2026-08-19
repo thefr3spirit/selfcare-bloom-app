@@ -99,6 +99,14 @@ jobs:
           file "$BINARY"
           lipo -info "$BINARY"
           codesign -dv "$BINARY" 2>&1 || true
+          echo "--- packaged Info.plist CFBundleIdentifier ---"
+          PLIST=$(find /tmp/ipa-check/Payload -maxdepth 2 -name 'Info.plist' | head -n1)
+          echo "Plist path: $PLIST"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$PLIST" || true
+          /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PLIST" || true
+          /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$PLIST" || true
+          echo "--- full plist dump ---"
+          plutil -p "$PLIST" || true
 
       - name: Upload to App Store Connect
         env:
