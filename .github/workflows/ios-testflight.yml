@@ -60,6 +60,18 @@ jobs:
             -authenticationKeyID "$KEY_ID" \
             -authenticationKeyIssuerID "$ISSUER_ID"
 
+      - name: Inspect archived binary (diagnostic)
+        run: |
+          BINARY="build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app/Runner"
+          echo "--- ls -la ---"
+          ls -la "$BINARY" || echo "FILE MISSING"
+          echo "--- file ---"
+          file "$BINARY" || true
+          echo "--- lipo -info ---"
+          lipo -info "$BINARY" || true
+          echo "--- codesign -dv ---"
+          codesign -dv "$BINARY" 2>&1 || true
+
       - name: Export & upload to App Store Connect
         env:
           KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
