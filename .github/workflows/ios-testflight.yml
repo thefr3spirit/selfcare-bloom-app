@@ -40,8 +40,9 @@ jobs:
           mkdir -p ~/.appstoreconnect/private_keys
           printf '%s' "$API_KEY_P8" > ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
 
-      - name: Build Flutter iOS app (unsigned)
-        run: flutter build ios --release --no-codesign
+      - name: Install CocoaPods dependencies
+        working-directory: ios
+        run: pod install --repo-update
 
       - name: Archive (automatic signing via API key)
         env:
@@ -80,6 +81,5 @@ jobs:
           path: |
             build/ios/archive/Runner.xcarchive/Info.plist
             build/ios/export/**
-            build/ios/export/*.log
           if-no-files-found: ignore
           retention-days: 7
