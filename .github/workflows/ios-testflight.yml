@@ -40,19 +40,7 @@ jobs:
         run: |
           mkdir -p ~/.appstoreconnect/private_keys
           printf '%s' "$API_KEY_P8" > ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
-          # Also write a JSON key file for fastlane pilot (used for the actual upload)
-          python3 -c "
-import json, os
-data = {
-    'key_id': os.environ['KEY_ID'],
-    'issuer_id': os.environ['ISSUER_ID'],
-    'key': os.environ['API_KEY_P8'],
-    'duration': 1200,
-    'in_house': False,
-}
-with open(os.path.expanduser('~/appstoreconnect_api_key.json'), 'w') as f:
-    json.dump(data, f)
-"
+          python3 -c "import json, os; json.dump({'key_id': os.environ['KEY_ID'], 'issuer_id': os.environ['ISSUER_ID'], 'key': os.environ['API_KEY_P8'], 'duration': 1200, 'in_house': False}, open(os.path.expanduser('~/appstoreconnect_api_key.json'), 'w'))"
 
       - name: Install CocoaPods dependencies
         working-directory: ios
