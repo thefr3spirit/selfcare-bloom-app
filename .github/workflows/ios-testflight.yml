@@ -32,10 +32,6 @@ jobs:
           find lib -name "*.g.dart"
           test -f lib/models/user_profile.g.dart || (echo "::error::user_profile.g.dart was not generated" && exit 1)
 
-      - name: Install CocoaPods dependencies
-        working-directory: ios
-        run: pod install --repo-update
-
       - name: Install App Store Connect API key
         env:
           KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
@@ -45,7 +41,7 @@ jobs:
           printf '%s' "$API_KEY_P8" > ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
 
       - name: Build Flutter iOS app (unsigned)
-        run: flutter build ios --release --no-codesign
+        run: flutter build ios --release --no-codesign --verbose
 
       - name: Archive (automatic signing via API key)
         env:
