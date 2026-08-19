@@ -24,7 +24,13 @@ jobs:
         run: flutter pub get
 
       - name: Generate Hive adapters (build_runner)
-        run: flutter pub run build_runner build --delete-conflicting-outputs
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Verify generated files exist
+        run: |
+          echo "Looking for *.g.dart files under lib/:"
+          find lib -name "*.g.dart"
+          test -f lib/models/user_profile.g.dart || (echo "::error::user_profile.g.dart was not generated" && exit 1)
 
       - name: Install CocoaPods dependencies
         working-directory: ios
