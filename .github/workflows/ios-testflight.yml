@@ -114,12 +114,26 @@ jobs:
           echo "--- full plist dump ---"
           plutil -p "$PLIST" || true
 
+      - name: Re-zip IPA with standard zip (workaround for server-side validation)
+        run: |
+          ORIGINAL_IPA=$(find build/ios/export -name '*.ipa' | head -n1)
+          echo "--- zipinfo of xcodebuild-produced IPA ---"
+          zipinfo "$ORIGINAL_IPA" | head -20
+          rm -rf /tmp/ipa-rezip
+          mkdir -p /tmp/ipa-rezip
+          unzip -q "$ORIGINAL_IPA" -d /tmp/ipa-rezip
+          mkdir -p build/ios/export-rezip
+          (cd /tmp/ipa-rezip && zip -qry "$OLDPWD/build/ios/export-rezip/selfcare_together.ipa" Payload)
+          echo "--- zipinfo of re-zipped IPA ---"
+          zipinfo build/ios/export-rezip/selfcare_together.ipa | head -20
+          ls -la build/ios/export-rezip/
+
       - name: Install fastlane
         run: gem install fastlane -N
 
       - name: Upload to TestFlight via fastlane pilot
         run: |
-          IPA=$(find build/ios/export -name '*.ipa' | head -n1)
+          IPA=$(find build/ios/export-rezip -name '*.ipa' | head -n1)
           fastlane pilot upload \
             --ipa "$IPA" \
             --api_key_path "$HOME/appstoreconnect_api_key.json" \
