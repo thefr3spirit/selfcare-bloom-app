@@ -134,9 +134,11 @@ post_install do |installer|
   fw_script = File.join(installer.sandbox.root, 'Target Support Files', 'Pods-Runner', 'Pods-Runner-frameworks.sh')
   if File.exist?(fw_script)
     content = File.read(fw_script)
+    additions = ''
+
     unless content.include?('CM_FLUTTER_PLIST_INJECT')
       plist_xml = '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleExecutable</key><string>Flutter</string><key>CFBundleIdentifier</key><string>io.flutter.flutter</string><key>CFBundleInfoDictionaryVersion</key><string>6.0</string><key>CFBundleName</key><string>Flutter</string><key>CFBundlePackageType</key><string>FMWK</string><key>CFBundleShortVersionString</key><string>1.0</string><key>CFBundleVersion</key><string>1</string><key>MinimumOSVersion</key><string>15.0</string></dict></plist>'
-      inject = <<~BASH
+      additions += <<~BASH
 
         # CM_FLUTTER_PLIST_INJECT: Xcode 26+ requires Info.plist in embedded Flutter.framework.
         # Runs after all install_framework calls above, inside [CP] Embed Pods Frameworks.
@@ -149,10 +151,38 @@ post_install do |installer|
           fi
         done
       BASH
-      File.write(fw_script, content + inject)
-      puts "Patched Pods-Runner-frameworks.sh with CM_FLUTTER_PLIST_INJECT"
+    end
+
+    # A CocoaPods/Xcode embed-script bug (see the set +u / ditto guard above)
+    # can copy the entire ios/ build directory — including ios/.symlinks/, a
+    # build-time-only symlink farm Flutter's podhelper creates so Pods can
+    # reference plugin source without copying it — into Runner.app/Frameworks/.
+    # Those symlinks point at build-machine paths that don't resolve inside
+    # the sealed bundle, so codesign's own validation fails ("invalid
+    # destination for symbolic link in bundle"), and App Store Connect
+    # rejects the upload with an unrelated-sounding "No architectures in the
+    # binary" error. Must run here (before final app signing), not after
+    # archiving — removing files from an already-signed bundle invalidates
+    # its signature instead of fixing anything.
+    unless content.include?('CM_REMOVE_SYMLINKS_JUNK')
+      additions += <<~BASH
+
+        # CM_REMOVE_SYMLINKS_JUNK: strip stray .symlinks/ pollution from the
+        # embedded Frameworks folder before the bundle gets signed.
+        for _cm_fw_dir in "${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}" "${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}"; do
+          if [ -e "${_cm_fw_dir}/.symlinks" ]; then
+            echo "CM_REMOVE_SYMLINKS_JUNK: removing ${_cm_fw_dir}/.symlinks"
+            rm -rf "${_cm_fw_dir}/.symlinks"
+          fi
+        done
+      BASH
+    end
+
+    if additions.empty?
+      puts "Pods-Runner-frameworks.sh already has both patches"
     else
-      puts "Pods-Runner-frameworks.sh already has CM_FLUTTER_PLIST_INJECT"
+      File.write(fw_script, content + additions)
+      puts "Patched Pods-Runner-frameworks.sh (#{additions.include?('CM_FLUTTER_PLIST_INJECT') ? 'plist inject, ' : ''}#{additions.include?('CM_REMOVE_SYMLINKS_JUNK') ? 'symlinks cleanup' : ''})"
     end
   else
     puts "WARNING: Pods-Runner-frameworks.sh not found at #{fw_script}"
