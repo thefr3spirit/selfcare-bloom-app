@@ -116,13 +116,18 @@ jobs:
 
       - name: Inspect EVERY binary in the bundle (diagnostic)
         run: |
-          echo "Scanning all Mach-O binaries under Runner.app for architecture info..."
+          echo "Scanning all Mach-O binaries under Runner.app for architecture + signing info..."
           find /tmp/ipa-check/Payload/Runner.app -type f | while IFS= read -r f; do
             if file "$f" | grep -q "Mach-O"; then
               echo "=== $f ==="
               lipo -info "$f" 2>&1
+              codesign -dv "$f" 2>&1
+              codesign --verify --strict "$f" 2>&1 && echo "codesign --verify: OK" || echo "codesign --verify: FAILED"
             fi
           done
+          echo ""
+          echo "--- codesign --verify --deep --strict on the whole app bundle ---"
+          codesign --verify --deep --strict --verbose=4 /tmp/ipa-check/Payload/Runner.app 2>&1
 
       - name: Install fastlane
         run: gem install fastlane -N
