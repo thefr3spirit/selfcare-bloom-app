@@ -97,6 +97,7 @@ jobs:
           IPA=$(find build/ios/export -name '*.ipa' | head -n1)
           echo "IPA path: $IPA"
           ls -la "$IPA"
+          shasum -a 256 "$IPA"
           mkdir -p /tmp/ipa-check
           unzip -q "$IPA" -d /tmp/ipa-check
           BINARY=$(find /tmp/ipa-check/Payload -maxdepth 2 -type f -perm -u+x | head -n1)
@@ -158,7 +159,12 @@ jobs:
 
       - name: Upload to TestFlight via fastlane pilot
         run: |
+          echo "--- All .ipa files under build/ios/export ---"
+          find build/ios/export -name '*.ipa' -exec ls -la {} \;
           IPA=$(find build/ios/export -name '*.ipa' | head -n1)
+          echo "--- Selected IPA for upload ---"
+          echo "$IPA"
+          shasum -a 256 "$IPA"
           fastlane pilot upload \
             --ipa "$IPA" \
             --api_key_path "$HOME/appstoreconnect_api_key.json" \
