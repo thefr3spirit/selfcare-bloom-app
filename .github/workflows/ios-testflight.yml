@@ -129,6 +129,30 @@ jobs:
           echo "--- codesign --verify --deep --strict on the whole app bundle ---"
           codesign --verify --deep --strict --verbose=4 /tmp/ipa-check/Payload/Runner.app 2>&1
 
+      - name: Inspect entitlements and provisioning profile (diagnostic)
+        run: |
+          echo "--- Entitlements baked into the signed Runner binary ---"
+          codesign -d --entitlements :- /tmp/ipa-check/Payload/Runner.app/Runner 2>&1
+          echo ""
+          echo "--- Embedded provisioning profile entitlements ---"
+          PROFILE=/tmp/ipa-check/Payload/Runner.app/embedded.mobileprovision
+          if [ -f "$PROFILE" ]; then
+            security cms -D -i "$PROFILE" > /tmp/profile.plist 2>&1
+            echo "Profile name / UUID / team / expiry:"
+            /usr/libexec/PlistBuddy -c "Print :Name" /tmp/profile.plist || true
+            /usr/libexec/PlistBuddy -c "Print :UUID" /tmp/profile.plist || true
+            /usr/libexec/PlistBuddy -c "Print :TeamIdentifier" /tmp/profile.plist || true
+            /usr/libexec/PlistBuddy -c "Print :ExpirationDate" /tmp/profile.plist || true
+            echo ""
+            echo "Full Entitlements dict from profile:"
+            /usr/libexec/PlistBuddy -c "Print :Entitlements" /tmp/profile.plist || true
+          else
+            echo "NO embedded.mobileprovision found in the app bundle!"
+          fi
+          echo ""
+          echo "--- Disk space on runner (ruling out truncation from low space) ---"
+          df -h /
+
       - name: Install fastlane
         run: gem install fastlane -N
 
