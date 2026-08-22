@@ -158,6 +158,7 @@ jobs:
         run: gem install fastlane -N
 
       - name: Upload to TestFlight via fastlane pilot
+        continue-on-error: true
         run: |
           echo "--- All .ipa files under build/ios/export ---"
           find build/ios/export -name '*.ipa' -exec ls -la {} \;
@@ -170,6 +171,19 @@ jobs:
             --api_key_path "$HOME/appstoreconnect_api_key.json" \
             --skip_waiting_for_build_processing true \
             --skip_submission true
+
+      - name: Upload to TestFlight via iTMSTransporter (alternative tool, different code path than altool)
+        if: always()
+        env:
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          IPA=$(find build/ios/export -name '*.ipa' | head -n1)
+          echo "Uploading $IPA via iTMSTransporter..."
+          xcrun iTMSTransporter -m upload \
+            -assetFile "$IPA" \
+            -apiKey "$KEY_ID" \
+            -apiIssuer "$ISSUER_ID"
 
       - name: Upload build artifacts (for debugging)
         if: always()
