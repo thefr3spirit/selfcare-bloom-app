@@ -178,11 +178,45 @@ post_install do |installer|
       BASH
     end
 
+    # Confirmed via a real shipped IPA (Xcode 26.3 archive): the same
+    # ditto/set-u bug can go further than just .symlinks/ and copy the
+    # *entire* ios/ source directory — Podfile, Podfile.lock, .gitignore,
+    # ExportOptions-ci.plist, Pods/, and a whole Runner/ subfolder
+    # containing the UNPROCESSED Info.plist template (raw, un-substituted
+    # $(PRODUCT_BUNDLE_IDENTIFIER)/$(EXECUTABLE_NAME)/etc. macros) — into
+    # Runner.app/Frameworks/. Apple's upload validator chokes on that
+    # bogus "Runner"-named entry (no real Mach-O executable inside it,
+    # and/or an Info.plist with a literal unresolved bundle-id macro) and
+    # rejects with the unrelated-sounding "No architectures in the binary"
+    # error, or "Cannot determine the Apple ID from Bundle ID
+    # '$(PRODUCT_BUNDLE_IDENTIFIER)'". Only *.framework/*.dylib/*.bundle
+    # belong directly under Frameworks/ — delete anything else found there.
+    unless content.include?('CM_WHITELIST_FRAMEWORKS_DIR')
+      additions += <<~BASH
+
+        # CM_WHITELIST_FRAMEWORKS_DIR: strip any non-framework junk (stray
+        # copies of ios/ source files/dirs) from the embedded Frameworks
+        # folder before the bundle gets signed.
+        for _cm_fw_dir in "${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}" "${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}"; do
+          if [ -d "${_cm_fw_dir}" ]; then
+            find "${_cm_fw_dir}" -mindepth 1 -maxdepth 1 ! -name "*.framework" ! -name "*.dylib" ! -name "*.bundle" -print0 | while IFS= read -r -d '' _cm_junk; do
+              echo "CM_WHITELIST_FRAMEWORKS_DIR: removing stray ${_cm_junk}"
+              rm -rf "${_cm_junk}"
+            done
+          fi
+        done
+      BASH
+    end
+
     if additions.empty?
-      puts "Pods-Runner-frameworks.sh already has both patches"
+      puts "Pods-Runner-frameworks.sh already has all patches"
     else
+      applied = []
+      applied << 'plist inject' if additions.include?('CM_FLUTTER_PLIST_INJECT')
+      applied << 'symlinks cleanup' if additions.include?('CM_REMOVE_SYMLINKS_JUNK')
+      applied << 'frameworks-dir whitelist' if additions.include?('CM_WHITELIST_FRAMEWORKS_DIR')
       File.write(fw_script, content + additions)
-      puts "Patched Pods-Runner-frameworks.sh (#{additions.include?('CM_FLUTTER_PLIST_INJECT') ? 'plist inject, ' : ''}#{additions.include?('CM_REMOVE_SYMLINKS_JUNK') ? 'symlinks cleanup' : ''})"
+      puts "Patched Pods-Runner-frameworks.sh (#{applied.join(', ')})"
     end
   else
     puts "WARNING: Pods-Runner-frameworks.sh not found at #{fw_script}"
