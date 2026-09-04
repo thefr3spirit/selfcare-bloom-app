@@ -30,6 +30,9 @@ jobs:
     timeout-minutes: 30
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -38,6 +41,36 @@ jobs:
 
       - name: Create throwaway Flutter app
         run: flutter create --project-name diagtest --org com.selfcarebloom /tmp/diagtest
+
+      # Bisection round 1: add the "heavy" dependency cluster (Firebase incl.
+      # Firestore's gRPC/abseil/leveldb/nanopb C++ stack, plus Google/Apple
+      # Sign-In) — the most structurally complex frameworks in the real app,
+      # and the most plausible source of whatever is tripping Apple's
+      # architecture check. If this reproduces "No architectures in the
+      # binary", the culprit is narrowed to this cluster; if not, it's in
+      # the remaining lightweight utility plugins instead.
+      - name: Add suspect dependency cluster (Firebase/gRPC/Sign-In)
+        working-directory: /tmp/diagtest
+        run: |
+          cat >> pubspec.yaml << 'EOF'
+
+            firebase_core: ^4.0.0
+            firebase_auth: ^6.0.0
+            cloud_firestore: ^6.0.0
+            firebase_messaging: ^16.0.0
+            cloud_functions: ^6.0.0
+            google_sign_in: ^6.2.1
+            sign_in_with_apple: ^6.1.4
+            crypto: ^3.0.3
+          EOF
+          flutter pub get
+
+      - name: Copy customized Podfile from real app
+        run: cp "${{ github.workspace }}/ios/Podfile" /tmp/diagtest/ios/Podfile
+
+      - name: Install CocoaPods dependencies
+        working-directory: /tmp/diagtest/ios
+        run: pod install --repo-update
 
       - name: Install App Store Connect API key
         env:
