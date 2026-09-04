@@ -7,12 +7,19 @@ on:
 
 jobs:
   build-and-upload:
-    # Pinned to an older, more mature Xcode generation (not macos-latest's
-    # Xcode 26.6 default) — both xcodebuild's destination:upload and altool
-    # (which fastlane pilot also shells out to) fail against a provably
-    # valid IPA via Xcode 26.6's ContentDelivery.framework specifically.
     runs-on: macos-15
     timeout-minutes: 60
+    env:
+      # Apple now hard-requires apps be built with the iOS 26 SDK (Xcode 26+)
+      # to upload at all — confirmed via a throwaway-app diagnostic that hit
+      # a clean "SDK version issue. This app was built with the iOS 18.5 SDK...
+      # must be built with the iOS 26 SDK or later" rejection when archived
+      # with macos-15's default Xcode 16.4. The persistent "No architectures
+      # in the binary" error this app has been hitting may well be the same
+      # underlying SDK-too-old rejection surfacing under a misleading message.
+      # macos-15 ships Xcode 26.3 side-by-side; point at it explicitly rather
+      # than switching runner images.
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
 
     steps:
       - name: Checkout
@@ -176,7 +183,6 @@ jobs:
         run: gem install fastlane -N
 
       - name: Upload to TestFlight via fastlane pilot
-        continue-on-error: true
         run: |
           echo "--- All .ipa files under build/ios/export ---"
           find build/ios/export -name '*.ipa' -exec ls -la {} \;
@@ -192,6 +198,7 @@ jobs:
 
       - name: Upload to TestFlight via iTMSTransporter (alternative tool, different code path than altool)
         if: always()
+        continue-on-error: true
         env:
           KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
