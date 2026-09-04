@@ -22,10 +22,12 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           # 3.35.7 predates Flutter's UIScene/FlutterSceneLifeCycleDelegate APIs
-          # (added in 3.38.0). firebase_auth ^6.0.0 resolved to 6.6.1, whose iOS
-          # Swift plugin code now assumes those APIs exist, breaking the Archive
-          # step with "cannot find type 'FlutterSceneLifeCycleDelegate' in scope".
-          flutter-version: '3.38.0'
+          # (added in 3.38.0), which firebase_auth 6.6.1's iOS plugin now needs.
+          # 3.38.0 itself has a distinct regression ("Improperly formatted define
+          # flag" / "Failed to copy Flutter framework" during Archive, caused by
+          # flutter_export_environment.sh's DART_DEFINES being malformed —
+          # https://github.com/flutter/flutter/issues/178452), fixed in 3.38.2.
+          flutter-version: '3.38.2'
           channel: 'stable'
 
       - name: Install Flutter dependencies
