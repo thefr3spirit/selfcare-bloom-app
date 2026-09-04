@@ -137,17 +137,33 @@ post_install do |installer|
     additions = ''
 
     unless content.include?('CM_FLUTTER_PLIST_INJECT')
-      plist_xml = '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleExecutable</key><string>Flutter</string><key>CFBundleIdentifier</key><string>io.flutter.flutter</string><key>CFBundleInfoDictionaryVersion</key><string>6.0</string><key>CFBundleName</key><string>Flutter</string><key>CFBundlePackageType</key><string>FMWK</string><key>CFBundleShortVersionString</key><string>1.0</string><key>CFBundleVersion</key><string>1</string><key>MinimumOSVersion</key><string>15.0</string></dict></plist>'
+      # App.framework (Flutter's own compiled-Dart-code framework, produced
+      # fresh by `flutter assemble` on every build — distinct from the
+      # engine's Flutter.xcframework) needs the exact same treatment: Xcode
+      # 26+ / App Store Connect rejects any embedded framework missing a
+      # MinimumOSVersion in its Info.plist ("Invalid MinimumOSVersion...
+      # MinimumOSVersion in 'Runner.app/Frameworks/App.framework' is ''" /
+      # "Missing Info.plist value... 'MinimumOSVersion' ... is required"),
+      # confirmed via a real upload rejection.
+      flutter_plist_xml = '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleExecutable</key><string>Flutter</string><key>CFBundleIdentifier</key><string>io.flutter.flutter</string><key>CFBundleInfoDictionaryVersion</key><string>6.0</string><key>CFBundleName</key><string>Flutter</string><key>CFBundlePackageType</key><string>FMWK</string><key>CFBundleShortVersionString</key><string>1.0</string><key>CFBundleVersion</key><string>1</string><key>MinimumOSVersion</key><string>15.0</string></dict></plist>'
+      app_plist_xml = '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleExecutable</key><string>App</string><key>CFBundleIdentifier</key><string>io.flutter.flutter.app</string><key>CFBundleInfoDictionaryVersion</key><string>6.0</string><key>CFBundleName</key><string>App</string><key>CFBundlePackageType</key><string>FMWK</string><key>CFBundleShortVersionString</key><string>1.0</string><key>CFBundleVersion</key><string>1</string><key>MinimumOSVersion</key><string>15.0</string></dict></plist>'
       additions += <<~BASH
 
-        # CM_FLUTTER_PLIST_INJECT: Xcode 26+ requires Info.plist in embedded Flutter.framework.
+        # CM_FLUTTER_PLIST_INJECT: Xcode 26+ requires Info.plist (with
+        # MinimumOSVersion) in embedded Flutter.framework AND App.framework.
         # Runs after all install_framework calls above, inside [CP] Embed Pods Frameworks.
         for _cm_base in "${TARGET_BUILD_DIR}" "${BUILT_PRODUCTS_DIR}"; do
           _cm_fw="${_cm_base}/${FRAMEWORKS_FOLDER_PATH}/Flutter.framework"
           if [ -d "${_cm_fw}" ] && [ ! -f "${_cm_fw}/Info.plist" ]; then
-            printf '%s' '#{plist_xml}' > "${_cm_fw}/Info.plist" \
+            printf '%s' '#{flutter_plist_xml}' > "${_cm_fw}/Info.plist" \
               && echo "CM_FLUTTER_PLIST_INJECT: patched ${_cm_fw}" \
               || echo "CM_FLUTTER_PLIST_INJECT: FAILED at ${_cm_fw}"
+          fi
+          _cm_app_fw="${_cm_base}/${FRAMEWORKS_FOLDER_PATH}/App.framework"
+          if [ -d "${_cm_app_fw}" ] && [ ! -f "${_cm_app_fw}/Info.plist" ]; then
+            printf '%s' '#{app_plist_xml}' > "${_cm_app_fw}/Info.plist" \
+              && echo "CM_FLUTTER_PLIST_INJECT: patched ${_cm_app_fw}" \
+              || echo "CM_FLUTTER_PLIST_INJECT: FAILED at ${_cm_app_fw}"
           fi
         done
       BASH
