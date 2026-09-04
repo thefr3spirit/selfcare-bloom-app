@@ -44,10 +44,6 @@ jobs:
           printf '%s' "$API_KEY_P8" > ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
           python3 -c "import json, os; json.dump({'key_id': os.environ['KEY_ID'], 'issuer_id': os.environ['ISSUER_ID'], 'key': os.environ['API_KEY_P8'], 'duration': 1200, 'in_house': False}, open(os.path.expanduser('~/appstoreconnect_api_key.json'), 'w'))"
 
-      - name: Install CocoaPods dependencies
-        working-directory: /tmp/diagtest/ios
-        run: pod install --repo-update
-
       - name: Archive (automatic signing via API key)
         env:
           KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
