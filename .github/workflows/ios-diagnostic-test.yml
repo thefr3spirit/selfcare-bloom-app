@@ -1,0 +1,122 @@
+name: iOS Upload Diagnostic (throwaway app)
+
+# One-off diagnostic: builds a completely bare-bones, zero-plugin Flutter app
+# (created fresh by `flutter create`, no Firebase/CocoaPods complexity) and
+# pushes it through the same archive -> export -> TestFlight upload pipeline
+# as the real app, but against a brand-new bundle ID / App Store Connect app
+# record. Purpose: isolate whether the persistent "No architectures in the
+# binary" (409, STATE_ERROR.VALIDATION_ERROR) upload failure is specific to
+# the selfcare_together app's App Store Connect record, or environmental
+# (API key / account / pipeline) and would hit ANY app from this setup.
+#
+# Requires a throwaway App ID + App Store Connect app record to already
+# exist for DIAG_BUNDLE_ID below (see PR/commit description for the exact
+# manual setup steps — this cannot be automated, app names must be unique).
+on:
+  workflow_dispatch:
+
+env:
+  DIAG_BUNDLE_ID: com.selfcarebloom.diagtest
+  DEVELOPMENT_TEAM: C26VK7Y2WB
+
+jobs:
+  diagnostic-upload:
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.2'
+          channel: 'stable'
+
+      - name: Create throwaway Flutter app
+        run: flutter create --project-name diagtest --org com.selfcarebloom /tmp/diagtest
+
+      - name: Install App Store Connect API key
+        env:
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          printf '%s' "$API_KEY_P8" > ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
+          python3 -c "import json, os; json.dump({'key_id': os.environ['KEY_ID'], 'issuer_id': os.environ['ISSUER_ID'], 'key': os.environ['API_KEY_P8'], 'duration': 1200, 'in_house': False}, open(os.path.expanduser('~/appstoreconnect_api_key.json'), 'w'))"
+
+      - name: Install CocoaPods dependencies
+        working-directory: /tmp/diagtest/ios
+        run: pod install --repo-update
+
+      - name: Archive (automatic signing via API key)
+        env:
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          xcodebuild archive \
+            -workspace /tmp/diagtest/ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -archivePath /tmp/diagtest-build/Runner.xcarchive \
+            -destination 'generic/platform=iOS' \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8" \
+            -authenticationKeyID "$KEY_ID" \
+            -authenticationKeyIssuerID "$ISSUER_ID" \
+            PRODUCT_BUNDLE_IDENTIFIER="$DIAG_BUNDLE_ID" \
+            DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM"
+
+      - name: Write ExportOptions plist
+        run: |
+          cat > /tmp/ExportOptions-diag.plist << PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store</string>
+              <key>teamID</key>
+              <string>$DEVELOPMENT_TEAM</string>
+              <key>signingStyle</key>
+              <string>automatic</string>
+          </dict>
+          </plist>
+          PLIST
+
+      - name: Export IPA
+        env:
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath /tmp/diagtest-build/Runner.xcarchive \
+            -exportOptionsPlist /tmp/ExportOptions-diag.plist \
+            -exportPath /tmp/diagtest-export \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8" \
+            -authenticationKeyID "$KEY_ID" \
+            -authenticationKeyIssuerID "$ISSUER_ID"
+
+      - name: Inspect exported IPA (diagnostic)
+        run: |
+          IPA=$(find /tmp/diagtest-export -name '*.ipa' | head -n1)
+          echo "IPA path: $IPA"
+          ls -la "$IPA"
+          shasum -a 256 "$IPA"
+          BINARY_DIR=$(mktemp -d)
+          unzip -q "$IPA" -d "$BINARY_DIR"
+          BINARY=$(find "$BINARY_DIR/Payload" -maxdepth 2 -type f -perm -u+x | head -n1)
+          lipo -info "$BINARY"
+          codesign -dv "$BINARY" 2>&1 || true
+
+      - name: Install fastlane
+        run: gem install fastlane -N
+
+      - name: Upload to TestFlight via fastlane pilot
+        run: |
+          IPA=$(find /tmp/diagtest-export -name '*.ipa' | head -n1)
+          fastlane pilot upload \
+            --ipa "$IPA" \
+            --api_key_path "$HOME/appstoreconnect_api_key.json" \
+            --skip_waiting_for_build_processing true \
+            --skip_submission true
