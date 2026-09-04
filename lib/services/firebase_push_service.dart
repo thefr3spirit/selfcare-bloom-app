@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'dart:io';
 
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -192,56 +191,25 @@ class FirebasePushService {
     return 'unknown_platform';
   }
 
-  /// Store FCM token in Firestore via Cloud Functions
-  /// Call this after successful login/registration
+  /// Store FCM token for this device — DISABLED (was Cloud Functions-backed).
+  ///
+  /// cloud_functions was dropped alongside cloud_firestore (see git history:
+  /// bisection confirmed the gRPC/abseil/leveldb/nanopb dependency chain
+  /// pulled in by cloud_firestore was rejected by App Store Connect upload
+  /// validation with "No architectures in the binary"). Local push
+  /// notifications (FCM foreground/background handling, local notification
+  /// display) are unaffected — only server-side token storage is disabled.
   static Future<void> storeFCMToken() async {
-    try {
-      final token = await getDeviceToken();
-      if (token == null) {
-        debugPrint('Failed to get FCM token');
-        return;
-      }
-
-      final deviceId = await getDeviceId();
-
-      // Call Cloud Function to store token
-      final callable =
-          FirebaseFunctions.instance.httpsCallable('storeFCMToken');
-      await callable.call({
-        'token': token,
-        'deviceId': deviceId,
-      });
-
-      debugPrint('FCM token stored successfully: $deviceId');
-    } catch (e) {
-      debugPrint('Failed to store FCM token: $e');
-      // Non-critical error - user can still use app without push notifications
-    }
+    debugPrint('⏭️ FCM token storage disabled (cloud functions removed)');
   }
 
-  /// Update notification preferences via Cloud Functions
+  /// Update notification preferences — DISABLED (was Cloud Functions-backed).
   static Future<void> updateNotificationPreferences({
     required bool dailyReminder,
     required bool weeklyReport,
     required bool achievementUnlocks,
   }) async {
-    try {
-      final callable = FirebaseFunctions.instance.httpsCallable(
-        'updateNotificationPreferences',
-      );
-      await callable.call({
-        'preferences': {
-          'dailyReminder': dailyReminder,
-          'weeklyReport': weeklyReport,
-          'achievementUnlocks': achievementUnlocks,
-        },
-      });
-
-      debugPrint('Notification preferences updated successfully');
-    } catch (e) {
-      debugPrint('Failed to update notification preferences: $e');
-      rethrow; // Let caller handle the error
-    }
+    debugPrint('⏭️ Notification preferences sync disabled (cloud functions removed)');
   }
 
   /// Subscribe to topic (for broadcast notifications)

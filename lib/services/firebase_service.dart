@@ -1,18 +1,16 @@
 import 'dart:convert';
 import 'dart:math';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
-/// Firebase Authentication and Firestore Service
-/// Handles user authentication and cloud data sync
+/// Firebase Authentication Service
+/// Handles user authentication (email/password, Google, Apple, anonymous)
 class FirebaseService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
-  static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static final GoogleSignIn _googleSignIn = GoogleSignIn(
     // The web client ID (OAuth type 3) is required on Android so that
     // GoogleSignInAuthentication.idToken is populated. Without it the
@@ -54,22 +52,6 @@ class FirebaseService {
       if (displayName != null && userCredential.user != null) {
         await userCredential.user!.updateDisplayName(displayName);
         await userCredential.user!.reload();
-      }
-
-      // Create user profile in Firestore
-      if (userCredential.user != null) {
-        await _firestore.collection('users').doc(userCredential.user!.uid).set({
-          'email': email,
-          'displayName': displayName ?? '',
-          'createdAt': FieldValue.serverTimestamp(),
-          'totalAssessments': 0,
-          'isAnonymous': false,
-          'notificationPreferences': {
-            'dailyReminder': true,
-            'weeklyReport': true,
-            'achievementUnlocks': true,
-          },
-        });
       }
 
       debugPrint('Signed up successfully: ${userCredential.user?.uid}');
@@ -123,37 +105,6 @@ class FirebaseService {
 
       // Sign in to Firebase with the Google credential
       final userCredential = await _auth.signInWithCredential(credential);
-
-      // Create/update user profile in Firestore
-      if (userCredential.user != null) {
-        final userDoc =
-            _firestore.collection('users').doc(userCredential.user!.uid);
-
-        final docSnapshot = await userDoc.get();
-
-        if (!docSnapshot.exists) {
-          // New user - create profile
-          await userDoc.set({
-            'email': userCredential.user!.email ?? '',
-            'displayName': userCredential.user!.displayName ?? '',
-            'photoURL': userCredential.user!.photoURL ?? '',
-            'createdAt': FieldValue.serverTimestamp(),
-            'totalAssessments': 0,
-            'isAnonymous': false,
-            'authProvider': 'google',
-            'notificationPreferences': {
-              'dailyReminder': true,
-              'weeklyReport': true,
-              'achievementUnlocks': true,
-            },
-          });
-        } else {
-          // Existing user - update last login
-          await userDoc.update({
-            'lastLogin': FieldValue.serverTimestamp(),
-          });
-        }
-      }
 
       debugPrint('Signed in with Google: ${userCredential.user?.email}');
       return userCredential.user;
@@ -216,30 +167,6 @@ class FirebaseService {
           await user.updateDisplayName(appleFullName);
           await user.reload();
         }
-
-        final userDoc = _firestore.collection('users').doc(user.uid);
-        final docSnapshot = await userDoc.get();
-
-        if (!docSnapshot.exists) {
-          await userDoc.set({
-            'email': user.email ?? appleCredential.email ?? '',
-            'displayName': user.displayName ?? appleFullName,
-            'photoURL': user.photoURL ?? '',
-            'createdAt': FieldValue.serverTimestamp(),
-            'totalAssessments': 0,
-            'isAnonymous': false,
-            'authProvider': 'apple',
-            'notificationPreferences': {
-              'dailyReminder': true,
-              'weeklyReport': true,
-              'achievementUnlocks': true,
-            },
-          });
-        } else {
-          await userDoc.update({
-            'lastLogin': FieldValue.serverTimestamp(),
-          });
-        }
       }
 
       debugPrint('Signed in with Apple: ${user?.uid}');
@@ -276,13 +203,6 @@ class FirebaseService {
       if (photoURL != null) {
         await user.updatePhotoURL(photoURL);
       }
-
-      // Update Firestore
-      await _firestore.collection('users').doc(user.uid).update({
-        if (displayName != null) 'displayName': displayName,
-        if (photoURL != null) 'photoURL': photoURL,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
 
       await user.reload();
       debugPrint('User profile updated');
@@ -334,7 +254,6 @@ class FirebaseService {
         await user.reauthenticateWithCredential(credential);
       }
 
-      await _deleteUserData(user.uid);
       await user.delete();
       debugPrint('Account deleted successfully');
     } catch (e) {
@@ -361,7 +280,6 @@ class FirebaseService {
       );
       await user.reauthenticateWithCredential(credential);
 
-      await _deleteUserData(user.uid);
       await user.delete();
       await _googleSignIn.signOut();
       debugPrint('Google account deleted successfully');
@@ -396,7 +314,6 @@ class FirebaseService {
       );
       await user.reauthenticateWithCredential(oauthCredential);
 
-      await _deleteUserData(user.uid);
       await user.delete();
       debugPrint('Apple account deleted successfully');
     } catch (e) {
@@ -411,19 +328,6 @@ class FirebaseService {
     final user = _auth.currentUser;
     if (user == null || user.providerData.isEmpty) return null;
     return user.providerData.first.providerId;
-  }
-
-  /// Delete all Firestore data for a user
-  static Future<void> _deleteUserData(String uid) async {
-    final subCollections = ['assessments', 'feedback'];
-    for (final sub in subCollections) {
-      final snap =
-          await _firestore.collection('users').doc(uid).collection(sub).get();
-      for (final doc in snap.docs) {
-        await doc.reference.delete();
-      }
-    }
-    await _firestore.collection('users').doc(uid).delete();
   }
 
   /// Get current user
@@ -463,153 +367,17 @@ class FirebaseService {
   }
 
   // ============================================================================
-  // CLOUD FIRESTORE - DATA BACKUP
+  // CLOUD DATA BACKUP
   // ============================================================================
+  // Firestore-backed cloud sync/backup/analytics were removed (cloud_firestore
+  // and cloud_functions pull in a gRPC/abseil/leveldb/nanopb C++ dependency
+  // chain that App Store Connect rejects at upload validation with "No
+  // architectures in the binary" — confirmed via bisection, see git history).
+  // The app is offline-first (Hive) by design, so these are now no-ops kept
+  // only so existing call sites don't need to change.
 
-  /// Backup assessment to Firestore
-  static Future<void> backupAssessment(
-      Map<String, dynamic> assessmentData) async {
-    final userId = getUserId();
-    if (userId == null) return;
-
-    try {
-      await _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('assessments')
-          .add({
-        ...assessmentData,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-      debugPrint('Assessment backed up to Firestore');
-    } catch (e) {
-      debugPrint('Failed to backup assessment: $e');
-    }
-  }
-
-  /// Backup recommendation feedback to Firestore
+  /// No-op: recommendation feedback backup (cloud sync removed)
   static Future<void> backupFeedback(Map<String, dynamic> feedbackData) async {
-    final userId = getUserId();
-    if (userId == null) return;
-
-    try {
-      await _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('feedback')
-          .add({
-        ...feedbackData,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-      debugPrint('Feedback backed up to Firestore');
-    } catch (e) {
-      debugPrint('Failed to backup feedback: $e');
-    }
-  }
-
-  /// Get user's assessment history from cloud
-  static Future<List<Map<String, dynamic>>> getCloudAssessments() async {
-    final userId = getUserId();
-    if (userId == null) return [];
-
-    try {
-      final snapshot = await _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('assessments')
-          .orderBy('createdAt', descending: true)
-          .get();
-
-      return snapshot.docs.map((doc) => doc.data()).toList();
-    } catch (e) {
-      debugPrint('Failed to fetch cloud assessments: $e');
-      return [];
-    }
-  }
-
-  /// Sync local data to cloud (call after completing assessment)
-  static Future<void> syncToCloud({
-    required Map<String, dynamic> assessment,
-    List<Map<String, dynamic>>? stressors,
-    List<Map<String, dynamic>>? copingStrategies,
-  }) async {
-    final userId = getUserId();
-    if (userId == null) return;
-
-    try {
-      // Create a batch write
-      final batch = _firestore.batch();
-
-      // User document reference
-      final userDoc = _firestore.collection('users').doc(userId);
-
-      // Update user profile
-      batch.set(
-        userDoc,
-        {
-          'lastAssessmentDate': FieldValue.serverTimestamp(),
-          'totalAssessments': FieldValue.increment(1),
-        },
-        SetOptions(merge: true),
-      );
-
-      // Add assessment
-      final assessmentDoc = userDoc.collection('assessments').doc();
-      batch.set(assessmentDoc, {
-        ...assessment,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
-      // Add stressors
-      if (stressors != null) {
-        for (var stressor in stressors) {
-          final stressorDoc = assessmentDoc.collection('stressors').doc();
-          batch.set(stressorDoc, stressor);
-        }
-      }
-
-      // Add coping strategies
-      if (copingStrategies != null) {
-        for (var strategy in copingStrategies) {
-          final strategyDoc =
-              assessmentDoc.collection('coping_strategies').doc();
-          batch.set(strategyDoc, strategy);
-        }
-      }
-
-      await batch.commit();
-      debugPrint('Data synced to cloud successfully');
-    } catch (e) {
-      debugPrint('Failed to sync data to cloud: $e');
-    }
-  }
-
-  // ============================================================================
-  // ANALYTICS & INSIGHTS
-  // ============================================================================
-
-  /// Save aggregated stats for research analysis
-  static Future<void> saveResearchData({
-    required String userId,
-    required int pssScore,
-    required String stressCategory,
-    required int stressorCount,
-    required int copingStrategyCount,
-    required bool isCrisis,
-  }) async {
-    try {
-      await _firestore.collection('research_analytics').add({
-        'userId': userId,
-        'pssScore': pssScore,
-        'stressCategory': stressCategory,
-        'stressorCount': stressorCount,
-        'copingStrategyCount': copingStrategyCount,
-        'isCrisis': isCrisis,
-        'timestamp': FieldValue.serverTimestamp(),
-        'country': 'Uganda/Kenya', // Can be made dynamic
-      });
-    } catch (e) {
-      debugPrint('Failed to save research data: $e');
-    }
+    debugPrint('Feedback backup skipped (cloud sync disabled)');
   }
 }
