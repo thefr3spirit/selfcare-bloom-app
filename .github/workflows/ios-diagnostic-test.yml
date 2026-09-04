@@ -95,7 +95,6 @@ jobs:
             -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8" \
             -authenticationKeyID "$KEY_ID" \
             -authenticationKeyIssuerID "$ISSUER_ID" \
-            PRODUCT_BUNDLE_IDENTIFIER="$DIAG_BUNDLE_ID" \
             DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM"
 
       - name: Write ExportOptions plist
@@ -152,3 +151,12 @@ jobs:
             --api_key_path "$HOME/appstoreconnect_api_key.json" \
             --skip_waiting_for_build_processing true \
             --skip_submission true
+
+      - name: Upload build artifacts (for debugging)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagtest-build-output
+          path: /tmp/diagtest-export/**
+          if-no-files-found: ignore
+          retention-days: 3
