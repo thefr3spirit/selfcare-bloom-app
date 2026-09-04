@@ -18,6 +18,11 @@ on:
 env:
   DIAG_BUNDLE_ID: com.selfcarebloom.diagtest
   DEVELOPMENT_TEAM: C26VK7Y2WB
+  # Apple now hard-requires apps be built with the iOS 26 SDK (Xcode 26+) to
+  # upload at all — confirmed by a real, clean "SDK version issue" rejection
+  # from a prior run of this same workflow using the runner's default Xcode
+  # 16.4. macos-15 ships Xcode 26.3 side-by-side; point at it explicitly.
+  DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
 
 jobs:
   diagnostic-upload:
