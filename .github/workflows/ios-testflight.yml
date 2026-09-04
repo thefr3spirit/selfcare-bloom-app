@@ -118,17 +118,29 @@ jobs:
       - name: Inspect EVERY binary in the bundle (diagnostic)
         run: |
           echo "Scanning all Mach-O binaries under Runner.app for architecture + signing info..."
+          echo "Per TN3117 (Apple Developer Support's own pointer, case 20000144564960):"
+          echo "on an Apple Silicon build host, an XCFramework's ios-arm64-simulator slice"
+          echo "and its ios-arm64 (device) slice both report as plain 'arm64' to lipo -info,"
+          echo "so a wrong-slice embed would pass every check we've run so far. Checking the"
+          echo "actual platform tag (LC_BUILD_VERSION) of every binary to rule that out."
+          SIM_FOUND=0
           find /tmp/ipa-check/Payload/Runner.app -type f | while IFS= read -r f; do
             if file "$f" | grep -q "Mach-O"; then
               echo "=== $f ==="
               lipo -info "$f" 2>&1
               codesign -dv "$f" 2>&1
               codesign --verify --strict "$f" 2>&1 && echo "codesign --verify: OK" || echo "codesign --verify: FAILED"
+              echo "--- platform (vtool) ---"
+              xcrun vtool -show-build "$f" 2>&1
             fi
           done
           echo ""
           echo "--- codesign --verify --deep --strict on the whole app bundle ---"
           codesign --verify --deep --strict --verbose=4 /tmp/ipa-check/Payload/Runner.app 2>&1
+          echo ""
+          echo "--- SUMMARY: any binary tagged as IOSSIMULATOR platform? (this would be the bug) ---"
+          find /tmp/ipa-check/Payload/Runner.app -type f -exec sh -c 'file "$1" | grep -q Mach-O && xcrun vtool -show-build "$1" 2>&1 | grep -q "platform IOSSIMULATOR" && echo "SIMULATOR SLICE FOUND: $1"' _ {} \;
+          echo "(if nothing printed above this line, no simulator-platform binaries were found)"
 
       - name: Inspect entitlements and provisioning profile (diagnostic)
         run: |
