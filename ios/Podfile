@@ -159,11 +159,25 @@ post_install do |installer|
               && echo "CM_FLUTTER_PLIST_INJECT: patched ${_cm_fw}" \
               || echo "CM_FLUTTER_PLIST_INJECT: FAILED at ${_cm_fw}"
           fi
+          # App.framework is regenerated fresh by `flutter assemble` on every
+          # build and already ships its OWN real Info.plist (with a real
+          # CFBundleVersion etc.) — it's not missing entirely, it's just
+          # missing the MinimumOSVersion key within it (confirmed by
+          # downloading and inspecting a real rejected IPA). Add/fix just
+          # that key via PlistBuddy rather than clobbering Flutter's plist;
+          # only fall back to writing our own plist from scratch if the file
+          # is somehow missing outright.
           _cm_app_fw="${_cm_base}/${FRAMEWORKS_FOLDER_PATH}/App.framework"
-          if [ -d "${_cm_app_fw}" ] && [ ! -f "${_cm_app_fw}/Info.plist" ]; then
-            printf '%s' '#{app_plist_xml}' > "${_cm_app_fw}/Info.plist" \
-              && echo "CM_FLUTTER_PLIST_INJECT: patched ${_cm_app_fw}" \
-              || echo "CM_FLUTTER_PLIST_INJECT: FAILED at ${_cm_app_fw}"
+          if [ -d "${_cm_app_fw}" ]; then
+            if [ -f "${_cm_app_fw}/Info.plist" ]; then
+              /usr/libexec/PlistBuddy -c "Add :MinimumOSVersion string 15.0" "${_cm_app_fw}/Info.plist" 2>/dev/null \
+                || /usr/libexec/PlistBuddy -c "Set :MinimumOSVersion 15.0" "${_cm_app_fw}/Info.plist" 2>/dev/null
+              echo "CM_FLUTTER_PLIST_INJECT: ensured MinimumOSVersion in ${_cm_app_fw}/Info.plist"
+            else
+              printf '%s' '#{app_plist_xml}' > "${_cm_app_fw}/Info.plist" \
+                && echo "CM_FLUTTER_PLIST_INJECT: patched ${_cm_app_fw}" \
+                || echo "CM_FLUTTER_PLIST_INJECT: FAILED at ${_cm_app_fw}"
+            fi
           fi
         done
       BASH
