@@ -47,10 +47,25 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Future<void> _completeOnboarding() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('onboarding_complete', true);
-    if (mounted) {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('onboarding_complete', true);
+    } catch (e) {
+      debugPrint('Failed to persist onboarding_complete: $e');
+      // Not fatal — still navigate on, so the user isn't stuck. Onboarding
+      // may just show again next launch if this keeps failing.
+    }
+
+    if (!mounted) return;
+    try {
       Navigator.of(context).pushReplacementNamed('/login');
+    } catch (e) {
+      debugPrint('Failed to navigate to /login: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Something went wrong: $e')),
+        );
+      }
     }
   }
 

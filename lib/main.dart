@@ -19,6 +19,24 @@ import 'services/storage_service.dart';
 import 'theme/app_theme.dart';
 import 'theme/theme_provider.dart';
 
+/// Lets code outside the widget tree (namely the error handlers below) show
+/// a SnackBar. Without this, an uncaught error anywhere in the app — the
+/// exact pattern behind two separate silent-failure bugs already found
+/// (a white screen at launch, an onboarding button doing nothing) — is
+/// invisible on a release/TestFlight build: it just hits debugPrint, which
+/// nobody watching the app can see. Surfacing it here makes any future
+/// occurrence self-diagnosing instead of another guessing round.
+final rootScaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
+
+void _showUnexpectedErrorSnackBar(Object error) {
+  rootScaffoldMessengerKey.currentState?.showSnackBar(
+    SnackBar(
+      content: Text('Unexpected error: $error'),
+      duration: const Duration(seconds: 6),
+    ),
+  );
+}
+
 void main() async {
   runZonedGuarded(() async {
   // Ensure Flutter is initialized
@@ -29,6 +47,7 @@ void main() async {
     FlutterError.presentError(details);
     debugPrint('Flutter error: ${details.exception}');
     debugPrint('Stack: ${details.stack}');
+    _showUnexpectedErrorSnackBar(details.exception);
   };
 
   // Initialize Firebase
@@ -93,6 +112,7 @@ void main() async {
     // Catch ALL unhandled async/zone errors — prevents silent native crash
     debugPrint('Unhandled zone error: $error');
     debugPrint('Stack trace: $stack');
+    _showUnexpectedErrorSnackBar(error);
   });
 }
 
@@ -106,6 +126,7 @@ class SelfCareTogetherApp extends StatelessWidget {
       builder: (context, themeMode, _) {
         return MaterialApp(
           title: 'Selfcare & Bloom',
+          scaffoldMessengerKey: rootScaffoldMessengerKey,
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
