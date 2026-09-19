@@ -46,7 +46,18 @@ void main() async {
   }
 
   // Initialize storage
-  await StorageService.initialize();
+  // NOT allowed to throw past this point uncaught: runZonedGuarded's handler
+  // below only debugPrints (invisible on a release/TestFlight build) and
+  // never calls runApp() itself — if anything between here and runApp()
+  // threw uncaught, the app would launch to (and stay on) the plain white
+  // LaunchScreen.storyboard forever, indistinguishable from a hang. Every
+  // step here must catch its own failures so runApp() always gets called.
+  try {
+    await StorageService.initialize();
+  } catch (e, stack) {
+    debugPrint('Storage initialization failed: $e');
+    debugPrint('Stack: $stack');
+  }
 
   // 🔔 PRODUCTION NOTIFICATIONS: Firebase Cloud Messaging
   // Notifications are handled by FCM + Cloud Functions (server-side)
@@ -61,13 +72,21 @@ void main() async {
   debugPrint('✅ FCM notifications enabled via Cloud Functions');
 
   // Set preferred orientations (portrait only for simplicity)
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+  try {
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+  } catch (e) {
+    debugPrint('Setting preferred orientations failed (non-critical): $e');
+  }
 
   // Load saved theme preference
-  await ThemeNotifier.instance.initialize();
+  try {
+    await ThemeNotifier.instance.initialize();
+  } catch (e) {
+    debugPrint('Theme initialization failed (non-critical): $e');
+  }
 
   runApp(const SelfCareTogetherApp());
   }, (Object error, StackTrace stack) {
@@ -137,44 +156,60 @@ class _AppInitializerState extends State<AppInitializer> {
   }
 
   Future<void> _initialize() async {
-    // Check onboarding status
-    final prefs = await SharedPreferences.getInstance();
-    _onboardingComplete = prefs.getBool('onboarding_complete') ?? false;
-
-    // Check authentication status (guard against Firebase not being initialized)
+    // Whatever happens below, _isLoading must eventually flip to false —
+    // otherwise the app is stuck on the loading spinner forever, which on
+    // the default white Scaffold background is indistinguishable from a
+    // blank white screen to anyone not looking closely.
+    UserProfile? user;
     try {
-      _isAuthenticated = FirebaseService.isSignedIn();
-    } catch (_) {
-      _isAuthenticated = false;
-    }
+      // Check onboarding status
+      final prefs = await SharedPreferences.getInstance();
+      _onboardingComplete = prefs.getBool('onboarding_complete') ?? false;
 
-    // Check local storage first
-    var user = _storage.getUserProfile();
-
-    // If authenticated but no local consent, check Firestore (returning user after sign-out)
-    if (_isAuthenticated && (user == null || !user.hasConsented)) {
+      // Check authentication status (guard against Firebase not being initialized)
       try {
-        final cloudData = await FirestoreService.fetchUserProfile();
-        if (cloudData != null && cloudData['hasConsented'] == true) {
-          user = UserProfile.create(
-            name: cloudData['name'] as String? ??
-                FirebaseService.getUserDisplayName() ??
-                'User',
-            age: cloudData['age'] as int?,
-            gender: cloudData['gender'] as String?,
-          );
-          user.giveConsent();
-          await _storage.saveUserProfile(user);
-        }
+        _isAuthenticated = FirebaseService.isSignedIn();
       } catch (_) {
-        // Firestore unavailable — proceed to consent screen
+        _isAuthenticated = false;
+      }
+
+      // Check local storage first
+      try {
+        user = _storage.getUserProfile();
+      } catch (e) {
+        debugPrint('Reading local user profile failed: $e');
+      }
+
+      // If authenticated but no local consent, check Firestore (returning user after sign-out)
+      if (_isAuthenticated && (user == null || !user.hasConsented)) {
+        try {
+          final cloudData = await FirestoreService.fetchUserProfile();
+          if (cloudData != null && cloudData['hasConsented'] == true) {
+            user = UserProfile.create(
+              name: cloudData['name'] as String? ??
+                  FirebaseService.getUserDisplayName() ??
+                  'User',
+              age: cloudData['age'] as int?,
+              gender: cloudData['gender'] as String?,
+            );
+            user.giveConsent();
+            await _storage.saveUserProfile(user);
+          }
+        } catch (_) {
+          // Firestore unavailable — proceed to consent screen
+        }
+      }
+    } catch (e, stack) {
+      debugPrint('App initialization failed: $e');
+      debugPrint('Stack: $stack');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _hasConsented = user?.hasConsented ?? false;
+          _isLoading = false;
+        });
       }
     }
-
-    setState(() {
-      _hasConsented = user?.hasConsented ?? false;
-      _isLoading = false;
-    });
   }
 
   Future<void> _requestNotificationPermissions() async {
