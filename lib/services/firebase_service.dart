@@ -32,7 +32,11 @@ class FirebaseService {
       return userCredential.user;
     } catch (e) {
       debugPrint('Anonymous sign-in failed: $e');
-      return null;
+      // Rethrow (unlike the old behavior of returning null) so the caller's
+      // catch block can show the real error — login_screen.dart's
+      // _handleAnonymousLogin() has no "user == null" else-branch, so
+      // swallowing this here meant the button appeared to do nothing at all.
+      rethrow;
     }
   }
 
