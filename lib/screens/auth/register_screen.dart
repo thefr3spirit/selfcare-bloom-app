@@ -112,7 +112,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
     } else if (error.contains('network-request-failed')) {
       return 'Network error. Please check your internet connection.';
     }
-    return 'Registration failed. Please try again.';
+    // Unrecognized error: show it rather than a generic "please try again" —
+    // a fully generic message here was a real diagnostic dead end already
+    // (masked the actual cause of a real sign-in failure on TestFlight).
+    return 'Registration failed: $error';
   }
 
   Future<void> _handleGoogleSignIn() async {

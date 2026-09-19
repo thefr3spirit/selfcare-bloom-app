@@ -100,7 +100,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       setState(() {
-        _errorMessage = 'Anonymous login failed. Please try again.';
+        _errorMessage = _getFriendlyErrorMessage(e.toString());
       });
     } finally {
       if (mounted) {
@@ -223,7 +223,10 @@ class _LoginScreenState extends State<LoginScreen> {
     } else if (error.contains('network-request-failed')) {
       return 'Network error. Please check your internet connection.';
     }
-    return 'Login failed. Please try again.';
+    // Unrecognized error: show it rather than a generic "please try again" —
+    // a fully generic message here was a real diagnostic dead end already
+    // (masked the actual cause of a real sign-in failure on TestFlight).
+    return 'Login failed: $error';
   }
 
   @override
